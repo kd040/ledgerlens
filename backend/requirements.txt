@@ -6,10 +6,13 @@ fastapi==0.141.1
 h11==0.16.0
 httptools==0.8.0
 idna==3.19
+psycopg==3.3.4
+psycopg-binary==3.3.4
 pydantic==2.13.4
 pydantic_core==2.46.4
 python-dotenv==1.2.3
 PyYAML==6.0.3
+SQLAlchemy==2.0.52
 starlette==1.6.0
 typing-inspection==0.4.4
 typing_extensions==4.16.0

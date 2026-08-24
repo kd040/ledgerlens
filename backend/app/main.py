@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 
+from app.db.database import check_database_connection
+
+
 app = FastAPI(
     title="LedgerLens API",
     version="0.1.0",
@@ -13,4 +16,14 @@ def health_check():
         "status": "ok",
         "service": "ledgerlens-api",
         "version": "0.1.0",
+    }
+
+
+@app.get("/health/database")
+def database_health_check():
+    check_database_connection()
+
+    return {
+        "status": "ok",
+        "database": "connected",
     }
