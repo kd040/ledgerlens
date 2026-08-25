@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.db.database import check_database_connection
+from app.reconciliation.engine import reconcile_payments
 
 
 app = FastAPI(
@@ -26,4 +27,12 @@ def database_health_check():
     return {
         "status": "ok",
         "database": "connected",
+    }
+@app.post("/reconciliation/run")
+def run_reconciliation():
+    results = reconcile_payments()
+
+    return {
+        "status": "ok",
+        "results": results,
     }
