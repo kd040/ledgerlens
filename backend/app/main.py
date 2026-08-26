@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.db.database import check_database_connection
+from app.investigation.router import router as investigations_router
 from app.reconciliation.engine import reconcile_payments
 
 
@@ -9,6 +10,8 @@ app = FastAPI(
     version="0.1.0",
     description="Financial reconciliation and investigation API",
 )
+
+app.include_router(investigations_router)
 
 
 @app.get("/health")
