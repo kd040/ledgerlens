@@ -1,0 +1,702 @@
+[
+  {
+    "payment_reference": "PAY-001",
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null
+  },
+  {
+    "payment_reference": "PAY-002",
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "50.00",
+    "expected_investigation_category": "Amount Mismatch"
+  },
+  {
+    "payment_reference": "PAY-003",
+    "expected_state": "EX02",
+    "expected_category": "Missing Record",
+    "expected_financial_impact": "1500.00",
+    "expected_investigation_category": "Missing Record"
+  },
+  {
+    "payment_reference": "PAY-004",
+    "expected_state": "EX03",
+    "expected_category": "Duplicate Record",
+    "expected_financial_impact": "3000.00",
+    "expected_investigation_category": "Duplicate Record"
+  },
+  {
+    "payment_reference": "PAY-005",
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "1235.00",
+    "expected_investigation_category": "Amount Mismatch"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "372.48",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-006"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-007"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-008"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-009"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-010"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-011"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-012"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-013"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-014"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-015"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-016"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-017"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-018"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "597.54",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-019"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-020"
+  },
+  {
+    "expected_state": "EX02",
+    "expected_category": "Missing Record",
+    "expected_financial_impact": "1243.07",
+    "expected_investigation_category": "Missing Record",
+    "payment_reference": "PAY-021"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-022"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-023"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "590.85",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-024"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-025"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-026"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "172.51",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-027"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-028"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-029"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "185.10",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-030"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-031"
+  },
+  {
+    "expected_state": "EX03",
+    "expected_category": "Duplicate Record",
+    "expected_financial_impact": "2976.46",
+    "expected_investigation_category": "Duplicate Record",
+    "payment_reference": "PAY-032"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-033"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-034"
+  },
+  {
+    "expected_state": "EX02",
+    "expected_category": "Missing Record",
+    "expected_financial_impact": "1693.41",
+    "expected_investigation_category": "Missing Record",
+    "payment_reference": "PAY-035"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "297.25",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-036"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-037"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-038"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-039"
+  },
+  {
+    "expected_state": "EX03",
+    "expected_category": "Duplicate Record",
+    "expected_financial_impact": "3538.46",
+    "expected_investigation_category": "Duplicate Record",
+    "payment_reference": "PAY-040"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-041"
+  },
+  {
+    "expected_state": "EX03",
+    "expected_category": "Duplicate Record",
+    "expected_financial_impact": "4706.18",
+    "expected_investigation_category": "Duplicate Record",
+    "payment_reference": "PAY-042"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-043"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-044"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-045"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-046"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-047"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-048"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-049"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "207.83",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-050"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-051"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-052"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-053"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "1029.10",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-054"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-055"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-056"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-057"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-058"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-059"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-060"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-061"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-062"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-063"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-064"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-065"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-066"
+  },
+  {
+    "expected_state": "EX02",
+    "expected_category": "Missing Record",
+    "expected_financial_impact": "672.16",
+    "expected_investigation_category": "Missing Record",
+    "payment_reference": "PAY-067"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-068"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-069"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-070"
+  },
+  {
+    "expected_state": "EX02",
+    "expected_category": "Missing Record",
+    "expected_financial_impact": "2440.84",
+    "expected_investigation_category": "Missing Record",
+    "payment_reference": "PAY-071"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-072"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-073"
+  },
+  {
+    "expected_state": "EX03",
+    "expected_category": "Duplicate Record",
+    "expected_financial_impact": "1363.28",
+    "expected_investigation_category": "Duplicate Record",
+    "payment_reference": "PAY-074"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-075"
+  },
+  {
+    "expected_state": "EX03",
+    "expected_category": "Duplicate Record",
+    "expected_financial_impact": "1445.82",
+    "expected_investigation_category": "Duplicate Record",
+    "payment_reference": "PAY-076"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-077"
+  },
+  {
+    "expected_state": "EX02",
+    "expected_category": "Missing Record",
+    "expected_financial_impact": "3811.83",
+    "expected_investigation_category": "Missing Record",
+    "payment_reference": "PAY-078"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-079"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "355.94",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-080"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "386.87",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-081"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-082"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-083"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-084"
+  },
+  {
+    "expected_state": "EX02",
+    "expected_category": "Missing Record",
+    "expected_financial_impact": "4628.62",
+    "expected_investigation_category": "Missing Record",
+    "payment_reference": "PAY-085"
+  },
+  {
+    "expected_state": "EX03",
+    "expected_category": "Duplicate Record",
+    "expected_financial_impact": "3015.16",
+    "expected_investigation_category": "Duplicate Record",
+    "payment_reference": "PAY-086"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-087"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-088"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "410.77",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-089"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-090"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "80.72",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-091"
+  },
+  {
+    "expected_state": "EX02",
+    "expected_category": "Missing Record",
+    "expected_financial_impact": "2366.91",
+    "expected_investigation_category": "Missing Record",
+    "payment_reference": "PAY-092"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-093"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-094"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-095"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-096"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-097"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-098"
+  },
+  {
+    "expected_state": "RECONCILED",
+    "expected_category": null,
+    "expected_financial_impact": "0.00",
+    "expected_investigation_category": null,
+    "payment_reference": "PAY-099"
+  },
+  {
+    "expected_state": "EX01",
+    "expected_category": "Amount Mismatch",
+    "expected_financial_impact": "579.32",
+    "expected_investigation_category": "Amount Mismatch",
+    "payment_reference": "PAY-100"
+  }
+]
