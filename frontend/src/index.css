@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+  /*
+   * Restrained fintech palette: white/paper surfaces dominant, deep
+   * navy/indigo as the primary brand + interactive color, and standard
+   * semantic status colors (not a rainbow -- used only for badges, text,
+   * and thin borders, never as full card fills).
+   */
+  --color-paper: #fafaf9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f3f2ee;
+  --color-border: #e4e1d8;
+  --color-ink: #14171c;
+  --color-ink-muted: #5b5f6b;
+  --color-ink-faint: #8b8d93;
+
+  --color-accent: #2e3a8c;
+  --color-accent-muted: #e9eaf6;
+
+  /* Deep navy: the chrome/anchor color (sidebar, header) -- distinct
+     from --color-accent, which stays the interactive indigo/blue used
+     for links, active states, and the Human Review status. */
+  --color-navy: #0d1b3e;
+  --color-navy-ink: #aab4d6;
+  --color-navy-border: #24325c;
+
+  --color-success: #15803d;
+  --color-success-muted: #e7f3ea;
+  --color-warning: #b45309;
+  --color-warning-muted: #fbeee0;
+  --color-danger: #b91c1c;
+  --color-danger-muted: #fbe9e9;
+  /* EX02 Missing Record: orange, distinct from both amber (pending)
+     and red (mismatch/escalation) per the status model. */
+  --color-missing: #c2500a;
+  --color-missing-muted: #fdece0;
+  /* EX03 Duplicate Record. */
+  --color-duplicate: #7c3aed;
+  --color-duplicate-muted: #f1e9fd;
+  --color-neutral: #4a4f5c;
+  --color-neutral-muted: #ececea;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/*
+ * The one signature surface: faint ruled-paper lines, reserved for the
+ * Investigation Workspace's Evidence and Audit views -- the record of
+ * what the investigation actually did and found.
+ */
+.ruled-paper {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 43px,
+    var(--color-border) 43px,
+    var(--color-border) 44px
+  );
+}
