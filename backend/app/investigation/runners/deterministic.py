@@ -44,17 +44,22 @@ def connect() -> psycopg.Connection:
     return psycopg.connect(database_url)
 
 
-def _extract_payment_reference(description: str) -> str:
+def extract_payment_reference(description: str) -> str:
+    """Exception descriptions always embed the payment's external id
+    verbatim (see reconciliation/engine.py) -- either the eval dataset's
+    PAY-NNN scheme or a real Razorpay id (pay_...), so both prefixes are
+    recognized here."""
     for token in description.split():
-        if token.startswith("PAY-"):
-            return token.rstrip(",.")
+        cleaned = token.rstrip(",.")
+        if cleaned.startswith("PAY-") or cleaned.startswith("pay_"):
+            return cleaned
 
     raise ValueError(
         "Could not determine payment reference from exception description."
     )
 
 
-def _load_payment_by_reference(cur, payment_reference: str) -> dict[str, Any]:
+def load_payment_by_reference(cur, payment_reference: str) -> dict[str, Any]:
     cur.execute(
         """
         select id
@@ -174,11 +179,11 @@ def run_amount_mismatch_investigation(
             # 2. Payment
             # --------------------------------------------------
 
-            payment_reference = _extract_payment_reference(
+            payment_reference = extract_payment_reference(
                 exception["description"]
             )
 
-            payment = _load_payment_by_reference(cur, payment_reference)
+            payment = load_payment_by_reference(cur, payment_reference)
 
             record_tool_call(
                 cur,
@@ -455,11 +460,11 @@ def run_missing_record_investigation(
             # 2. Payment
             # --------------------------------------------------
 
-            payment_reference = _extract_payment_reference(
+            payment_reference = extract_payment_reference(
                 exception["description"]
             )
 
-            payment = _load_payment_by_reference(cur, payment_reference)
+            payment = load_payment_by_reference(cur, payment_reference)
 
             record_tool_call(
                 cur,
@@ -691,11 +696,11 @@ def run_duplicate_record_investigation(
             # 2. Payment
             # --------------------------------------------------
 
-            payment_reference = _extract_payment_reference(
+            payment_reference = extract_payment_reference(
                 exception["description"]
             )
 
-            payment = _load_payment_by_reference(cur, payment_reference)
+            payment = load_payment_by_reference(cur, payment_reference)
 
             record_tool_call(
                 cur,

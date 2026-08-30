@@ -61,7 +61,8 @@ def list_investigations(cur) -> list[dict[str, Any]]:
             i.recommendation,
             i.status,
             i.started_at,
-            i.completed_at
+            i.completed_at,
+            i.human_decision
         from investigations i
         join exceptions e on e.id = i.exception_id
         order by i.started_at desc
@@ -82,6 +83,7 @@ def list_investigations(cur) -> list[dict[str, Any]]:
             "status": row[7],
             "started_at": row[8].isoformat(),
             "completed_at": row[9].isoformat() if row[9] is not None else None,
+            "human_decision": row[10],
         }
         for row in rows
     ]
@@ -103,7 +105,9 @@ def get_investigation(cur, investigation_id: str) -> dict[str, Any] | None:
             i.status,
             i.financial_analysis,
             i.started_at,
-            i.completed_at
+            i.completed_at,
+            i.human_decision,
+            i.root_cause_assessment
         from investigations i
         join exceptions e on e.id = i.exception_id
         where i.id = %s
@@ -130,4 +134,6 @@ def get_investigation(cur, investigation_id: str) -> dict[str, Any] | None:
         "financial_analysis": row[10],
         "started_at": row[11].isoformat(),
         "completed_at": row[12].isoformat() if row[12] is not None else None,
+        "human_decision": row[13],
+        "root_cause_assessment": row[14],
     }

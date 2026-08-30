@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.investigation.runners.deterministic import extract_payment_reference
 from app.investigation.services.completion import determine_investigation_outcome
 from app.investigation.services.hypotheses import (
     evaluate_amount_mismatch_hypotheses,
@@ -22,6 +23,18 @@ from app.investigation.tools.financial import (
     calculate_duplicate_settlement_impact,
     calculate_missing_settlement_impact,
 )
+
+
+def test_extract_payment_reference_recognizes_eval_dataset_ids():
+    assert extract_payment_reference("Payment PAY-005 expected 100.") == "PAY-005"
+
+
+def test_extract_payment_reference_recognizes_razorpay_ids():
+    """Regression guard: exception descriptions for real Razorpay
+    payments embed pay_... ids, not PAY-NNN -- both must resolve, or
+    starting an investigation on a genuine Razorpay exception raises."""
+    description = "No settlement found for payment pay_TUTgDBuJLGCdRC."
+    assert extract_payment_reference(description) == "pay_TUTgDBuJLGCdRC"
 
 
 def test_calculate_amount_difference():
