@@ -18,6 +18,8 @@ section with its basis rather than implying one global filter.
 from decimal import Decimal
 from typing import Any
 
+from app.reconciliation.engine import SETTLEABLE_PAYMENT_STATUSES
+
 # Exceptions persist only OPEN / RESOLVED / ESCALATED (see
 # reconciliation/engine.py's create_exception and
 # investigation/services/resolution.py). IN_PROGRESS and HUMAN_REVIEW
@@ -107,6 +109,7 @@ def _financial_control(cur, start: str | None, end: str | None) -> dict[str, Any
             select
                 p.id,
                 p.amount as gross,
+                lower(p.status) <> all(%s) as not_captured,
                 count(sc.id) as settlement_count,
                 coalesce(sum(sc.settlement_amount), 0) as observed,
                 coalesce(sum(sc.fee), 0) as fee,
@@ -120,7 +123,7 @@ def _financial_control(cur, start: str | None, end: str | None) -> dict[str, Any
         )
         select
             count(*),
-            coalesce(sum(gross), 0),
+            coalesce(sum(gross) filter (where not not_captured), 0),
             coalesce(sum(observed), 0),
             coalesce(sum(fee), 0),
             coalesce(sum(tax), 0),
@@ -138,11 +141,15 @@ def _financial_control(cur, start: str | None, end: str | None) -> dict[str, Any
             ), 0),
             count(*) filter (where settlement_count > 1),
             coalesce(sum(observed) filter (where settlement_count > 1), 0),
-            count(*) filter (where settlement_count = 0),
-            coalesce(sum(gross) filter (where settlement_count = 0), 0)
+            count(*) filter (where settlement_count = 0 and not not_captured),
+            coalesce(
+                sum(gross) filter (where settlement_count = 0 and not not_captured), 0
+            ),
+            count(*) filter (where not_captured),
+            coalesce(sum(gross) filter (where not_captured), 0)
         from per_payment
         """,
-        params,
+        [sorted(SETTLEABLE_PAYMENT_STATUSES)] + params,
     )
 
     (
@@ -160,10 +167,18 @@ def _financial_control(cur, start: str | None, end: str | None) -> dict[str, Any
         duplicate_amount,
         unsettled_count,
         unsettled_amount,
+        not_captured_count,
+        not_captured_amount,
     ) = cur.fetchone()
 
     return {
         "total_payments": total_payments,
+        # "Gross processed" -- the value of payments that actually became
+        # money owed to the merchant. Payments the provider never
+        # captured are excluded here and reported on their own line
+        # below, so this figure means the same thing as the Overview and
+        # Reconciliation pages' own gross (see
+        # countsTowardGrossProcessed in frontend/src/lib/status.ts).
         "total_payment_value": _money(gross),
         "total_settled_value": _money(observed),
         "total_fees": _money(fee),
@@ -183,8 +198,16 @@ def _financial_control(cur, start: str | None, end: str | None) -> dict[str, Any
         "reconciled_amount": _money(reconciled_amount),
         "duplicate_settled_payments": duplicate_count,
         "duplicate_settlement_value": _money(duplicate_amount),
+        # Captured money that has not been settled -- both the genuine
+        # EX02s and the ones still inside the provider's settlement
+        # window. Payments the provider never captured are deliberately
+        # excluded: that money was never owed, so counting it as
+        # unsettled would overstate exposure (see
+        # NON_SETTLEABLE_PAYMENT_STATUSES).
         "unsettled_payments": unsettled_count,
         "unsettled_payment_value": _money(unsettled_amount),
+        "not_captured_payments": not_captured_count,
+        "not_captured_value": _money(not_captured_amount),
     }
 
 

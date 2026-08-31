@@ -65,13 +65,31 @@ def _ist_days_in_range(start: datetime, end: datetime) -> list[date]:
 
 
 def _insert_payment(cur, payment) -> None:
+    """Upsert, keyed on the provider's own payment id.
+
+    A payment's status is not fixed at Razorpay: one synced while still
+    `created` or `authorized` becomes `captured` later. `do nothing`
+    froze whatever the first sync happened to see, so a captured payment
+    could sit in LedgerLens as `created` forever and never reconcile.
+
+    Only the fields Razorpay is authoritative for are written back. The
+    row's `id` is untouched, so every reconciliation_link, exception
+    description and investigation that already points at this payment
+    keeps pointing at it. `created_at` is deliberately not updated:
+    Razorpay's payment creation instant never changes, and re-writing it
+    would only risk moving a payment between reporting periods.
+    """
     cur.execute(
         """
         insert into payments (
             external_payment_id, amount, currency, status, method, created_at
         )
         values (%s, %s, %s, %s, %s, %s)
-        on conflict (external_payment_id) do nothing
+        on conflict (external_payment_id) do update set
+            amount = excluded.amount,
+            currency = excluded.currency,
+            status = excluded.status,
+            method = excluded.method
         """,
         (
             payment["external_payment_id"],

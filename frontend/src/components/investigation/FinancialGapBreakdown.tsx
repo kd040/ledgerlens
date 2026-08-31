@@ -8,7 +8,11 @@ import {
   type CategoryFinancialImpact,
   type ExceptionCode,
 } from "../../lib/reconciliationMetrics";
-import type { ExceptionRecord, ReconciliationResult } from "../../domain/types";
+import type {
+  DataSource,
+  ExceptionRecord,
+  ReconciliationResult,
+} from "../../domain/types";
 
 interface FinancialGapBreakdownProps {
   open: boolean;
@@ -18,6 +22,9 @@ interface FinancialGapBreakdownProps {
   categories: CategoryFinancialImpact[];
   results: ReconciliationResult[];
   exceptionByPayment: Map<string, ExceptionRecord>;
+  /** Forwarded to the transaction drawer so a drilled-into row names the
+   * source it came from. */
+  source: DataSource;
 }
 
 /**
@@ -35,6 +42,7 @@ export function FinancialGapBreakdown({
   categories,
   results,
   exceptionByPayment,
+  source,
 }: FinancialGapBreakdownProps) {
   const [drilled, setDrilled] = useState<ExceptionCode | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<ReconciliationResult | null>(
@@ -140,6 +148,7 @@ export function FinancialGapBreakdown({
         onClose={() => setSelectedTransaction(null)}
         result={selectedTransaction}
         exceptionByPayment={exceptionByPayment}
+        source={source}
       />
     </>
   );

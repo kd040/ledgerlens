@@ -333,6 +333,15 @@ export function OverviewPage() {
               <StatTile label="Transactions" value={summary.recordsProcessed} />
               <StatTile label="Resolved" value={summary.counts.reconciled} />
               <StatTile label="Settlement pending" value={summary.counts.settlementPending} />
+              {summary.counts.notCaptured > 0 && (
+                <StatTile label="Not captured" value={summary.counts.notCaptured} />
+              )}
+              {summary.counts.unknownStatus > 0 && (
+                <StatTile
+                  label="Unsupported status"
+                  value={summary.counts.unknownStatus}
+                />
+              )}
               <StatTile
                 label="Exceptions"
                 value={summary.counts.ex01 + summary.counts.ex02 + summary.counts.ex03}
@@ -410,6 +419,18 @@ export function OverviewPage() {
                   {
                     label: "Settlement Pending",
                     value: summary.counts.settlementPending,
+                    color: "var(--color-warning)",
+                  },
+                  // Keeps the segments summing to recordsProcessed --
+                  // see DonutChart's own invariant.
+                  {
+                    label: "Not Captured",
+                    value: summary.counts.notCaptured,
+                    color: "var(--color-neutral)",
+                  },
+                  {
+                    label: "Unsupported Status",
+                    value: summary.counts.unknownStatus,
                     color: "var(--color-warning)",
                   },
                   {
@@ -525,6 +546,7 @@ export function OverviewPage() {
         categories={categoryImpacts}
         results={summary?.results ?? []}
         exceptionByPayment={exceptionByPayment}
+        source={summary?.source ?? source}
       />
     </div>
   );

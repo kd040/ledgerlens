@@ -15,6 +15,14 @@ export type HypothesisStatus =
 export type ReconciliationStatus =
   | "RECONCILED"
   | "SETTLEMENT_PENDING"
+  /** The provider never captured this payment, so no settlement is owed
+   * and it is not an exception -- see NON_SETTLEABLE_PAYMENT_STATUSES in
+   * backend/app/reconciliation/engine.py. */
+  | "NOT_CAPTURED"
+  /** The provider reported a status this engine does not classify. Not
+   * reconciled, and deliberately never an exception -- see
+   * SETTLEABLE_PAYMENT_STATUSES in the engine. */
+  | "UNKNOWN_STATUS"
   | "EX01"
   | "EX02"
   | "EX03";
@@ -136,6 +144,12 @@ export interface ReconciliationResult {
    * day-bucketing the daily financial trend -- kept as the raw date
    * string, not a Date, since it's a label, not an instant. */
   paymentDate: string | null;
+  /** The actual instant the payment was created, as reported by the
+   * source provider. A real Date, unlike paymentDate's day label. */
+  paymentCreatedAt: Date | null;
+  /** The provider's own status for the payment ("captured", "created",
+   * ...), distinct from the reconciliation outcome. */
+  paymentStatus: string | null;
 }
 
 export interface DailyFinancials {
@@ -179,6 +193,8 @@ export interface ReconciliationCounts {
   ex01: number;
   ex02: number;
   ex03: number;
+  notCaptured: number;
+  unknownStatus: number;
 }
 
 export interface ReconciliationRunSummary {
@@ -209,6 +225,8 @@ export interface ReportFinancialControl {
   duplicateSettlementValue: number;
   unsettledPayments: number;
   unsettledPaymentValue: number;
+  notCapturedPayments: number;
+  notCapturedValue: number;
 }
 
 export interface ReportExceptionCode {

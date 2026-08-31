@@ -10,7 +10,10 @@ import type {
   ReconciliationResult,
 } from "../domain/types";
 import { extractPaymentReference } from "./payment";
-import { investigationOutcomePresentation } from "./status";
+import {
+  countsTowardGrossProcessed,
+  investigationOutcomePresentation,
+} from "./status";
 
 function sum(values: (number | null)[]): number {
   return values.reduce((total: number, value) => total + (value ?? 0), 0);
@@ -29,7 +32,12 @@ export interface PeriodFinancials {
 export function computeFinancials(
   results: ReconciliationResult[],
 ): PeriodFinancials {
-  const gross = sum(results.map((r) => r.grossAmount));
+  // Never-captured and unclassifiable payments are excluded from every
+  // financial total here -- money that never became owed is not
+  // processed value. See countsTowardGrossProcessed; the backend's
+  // Reports module filters on the same rule so the two agree.
+  const processed = results.filter((r) => countsTowardGrossProcessed(r.status));
+  const gross = sum(processed.map((r) => r.grossAmount));
   const fees = sum(results.map((r) => r.feeAmount));
   const tax = sum(results.map((r) => r.taxAmount));
   const adjustments = sum(results.map((r) => r.adjustmentAmount));

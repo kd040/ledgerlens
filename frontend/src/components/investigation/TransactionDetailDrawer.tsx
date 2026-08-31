@@ -2,9 +2,17 @@ import { useNavigate } from "react-router-dom";
 import { useDuplicateSettlements, useStartInvestigation } from "../../api/queries";
 import { Drawer } from "../ui/Drawer";
 import { StatusBadge } from "../ui/StatusBadge";
-import { formatMoney } from "../../lib/format";
-import { reconciliationStatusPresentation } from "../../lib/status";
-import type { ExceptionRecord, ReconciliationResult } from "../../domain/types";
+import { formatDateTime, formatMoney } from "../../lib/format";
+import {
+  dataSourceLabel,
+  isExceptionStatus,
+  reconciliationStatusPresentation,
+} from "../../lib/status";
+import type {
+  DataSource,
+  ExceptionRecord,
+  ReconciliationResult,
+} from "../../domain/types";
 import { DuplicateSettlementsPanel } from "./DuplicateSettlementsPanel";
 
 interface TransactionDetailDrawerProps {
@@ -12,6 +20,32 @@ interface TransactionDetailDrawerProps {
   onClose: () => void;
   result: ReconciliationResult | null;
   exceptionByPayment: Map<string, ExceptionRecord>;
+  /** The source the run that produced this row came from -- a row is
+   * always from the run that fetched it (each source scopes
+   * reconciliation to its own payment ids), so this names the row's
+   * origin without guessing at the payment id's shape. */
+  source: DataSource;
+}
+
+/** One label/value line. Values that are identifiers, amounts, or
+ * timestamps render monospaced so columns of them stay scannable. */
+function DetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex justify-between gap-4 text-sm">
+      <span className="shrink-0 text-ink-muted">{label}</span>
+      <span className={`text-right text-ink ${mono ? "font-mono" : ""}`}>
+        {value}
+      </span>
+    </div>
+  );
 }
 
 /**
@@ -25,6 +59,7 @@ export function TransactionDetailDrawer({
   onClose,
   result,
   exceptionByPayment,
+  source,
 }: TransactionDetailDrawerProps) {
   const navigate = useNavigate();
   const startInvestigation = useStartInvestigation();
@@ -53,44 +88,88 @@ export function TransactionDetailDrawer({
             </div>
           </div>
 
+          {/* Identity: who/when/where this payment came from, before any
+              reconciliation arithmetic. A Razorpay row is only
+              recognisable as one if the id, the real capture timestamp,
+              and the source are all stated. */}
           <div className="flex flex-col gap-2 border-t border-border pt-4">
-            {result.category && (
-              <div className="flex justify-between text-sm">
-                <span className="text-ink-muted">Category</span>
-                <span className="text-ink">{result.category}</span>
-              </div>
-            )}
+            {/* The payment id is already the drawer's heading above --
+                not repeated here. */}
+            <DetailRow
+              label="Payment date"
+              value={
+                result.paymentCreatedAt
+                  ? formatDateTime(result.paymentCreatedAt)
+                  : "—"
+              }
+              mono={result.paymentCreatedAt !== null}
+            />
+            <DetailRow label="Source" value={dataSourceLabel(source)} />
             {result.grossAmount !== null && (
-              <div className="flex justify-between text-sm">
-                <span className="text-ink-muted">Gross</span>
-                <span className="font-mono text-ink">{formatMoney(result.grossAmount)}</span>
-              </div>
+              <DetailRow
+                label="Amount"
+                value={formatMoney(result.grossAmount)}
+                mono
+              />
             )}
-            {result.expectedAmount !== null && (
-              <div className="flex justify-between text-sm">
-                <span className="text-ink-muted">Expected</span>
-                <span className="font-mono text-ink">{formatMoney(result.expectedAmount)}</span>
-              </div>
+            {result.paymentStatus && (
+              <DetailRow
+                label="Payment status"
+                value={
+                  <span className="font-mono uppercase">
+                    {result.paymentStatus}
+                  </span>
+                }
+              />
             )}
-            {result.observedAmount !== null && (
-              <div className="flex justify-between text-sm">
-                <span className="text-ink-muted">Observed</span>
-                <span className="font-mono text-ink">{formatMoney(result.observedAmount)}</span>
-              </div>
-            )}
-            {result.difference !== null && (
-              <div className="flex justify-between text-sm">
-                <span className="text-ink-muted">Difference</span>
-                <span className="font-mono text-ink">{formatMoney(result.difference)}</span>
-              </div>
-            )}
-            {result.settlementCount !== null && (
-              <div className="flex justify-between text-sm">
-                <span className="text-ink-muted">Settlement records</span>
-                <span className="font-mono text-ink">{result.settlementCount} detected</span>
-              </div>
-            )}
+            {/* The settlement status is the badge under the heading
+                above -- not repeated as a row. `category` is only shown
+                when it says something the badge does not. */}
+            {result.category &&
+              result.category !==
+                reconciliationStatusPresentation(result.status).label && (
+                <DetailRow label="Category" value={result.category} />
+              )}
           </div>
+
+          {/* Settlement arithmetic only exists once a settlement does --
+              a pending or never-captured payment has none of it, and an
+              empty bordered block would read as a rendering fault. */}
+          {(result.expectedAmount !== null ||
+            result.observedAmount !== null ||
+            result.difference !== null ||
+            result.settlementCount !== null) && (
+            <div className="flex flex-col gap-2 border-t border-border pt-4">
+              {result.expectedAmount !== null && (
+                <DetailRow
+                  label="Expected"
+                  value={formatMoney(result.expectedAmount)}
+                  mono
+                />
+              )}
+              {result.observedAmount !== null && (
+                <DetailRow
+                  label="Observed"
+                  value={formatMoney(result.observedAmount)}
+                  mono
+                />
+              )}
+              {result.difference !== null && (
+                <DetailRow
+                  label="Difference"
+                  value={formatMoney(result.difference)}
+                  mono
+                />
+              )}
+              {result.settlementCount !== null && (
+                <DetailRow
+                  label="Settlement records"
+                  value={`${result.settlementCount} detected`}
+                  mono
+                />
+              )}
+            </div>
+          )}
 
           {result.status === "EX03" && (
             <div className="border-t border-border pt-4">
@@ -124,8 +203,16 @@ export function TransactionDetailDrawer({
                 window. This is normal lag, not a missing record.
               </p>
             )}
-            {result.status !== "RECONCILED" &&
-              result.status !== "SETTLEMENT_PENDING" &&
+            {result.status === "NOT_CAPTURED" && (
+              <p className="text-sm text-ink-muted">
+                This payment was never captured, so no settlement is owed for
+                it. Not a financial exception, and nothing to investigate.
+              </p>
+            )}
+            {/* Only a genuine EX01/EX02/EX03 row has an exception record
+                behind it, so only those can enter the investigation
+                workflow -- see isExceptionStatus. */}
+            {isExceptionStatus(result.status) &&
               matchedException?.investigationId && (
                 <button
                   type="button"
@@ -137,8 +224,7 @@ export function TransactionDetailDrawer({
                   View Investigation
                 </button>
               )}
-            {result.status !== "RECONCILED" &&
-              result.status !== "SETTLEMENT_PENDING" &&
+            {isExceptionStatus(result.status) &&
               matchedException &&
               !matchedException.investigationId && (
                 <button
@@ -155,14 +241,12 @@ export function TransactionDetailDrawer({
                   {startInvestigation.isPending ? "Starting…" : "Start Investigation"}
                 </button>
               )}
-            {result.status !== "RECONCILED" &&
-              result.status !== "SETTLEMENT_PENDING" &&
-              !matchedException && (
-                <p className="text-sm text-ink-faint">
-                  No matching exception record found yet -- open the Exception Center after
-                  reconciliation completes.
-                </p>
-              )}
+            {isExceptionStatus(result.status) && !matchedException && (
+              <p className="text-sm text-ink-faint">
+                No matching exception record found yet -- open the Exception Center after
+                reconciliation completes.
+              </p>
+            )}
           </div>
         </div>
       )}

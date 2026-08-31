@@ -29,6 +29,7 @@ import {
 } from "../lib/period";
 import {
   exceptionCodeLabel,
+  isExceptionStatus,
   reconciliationStatusPresentation,
 } from "../lib/status";
 import type { DataSource, ReconciliationResult } from "../domain/types";
@@ -305,6 +306,22 @@ export function ReconciliationPage() {
                 label="Settlement pending"
                 value={summary!.counts.settlementPending}
               />
+              {/* Only shown when it happened -- a permanently-zero tile
+                  on the demo dataset would be noise, but hiding a
+                  non-zero one would stop the tiles adding up to
+                  Transactions. */}
+              {summary!.counts.notCaptured > 0 && (
+                <StatTile
+                  label="Not captured"
+                  value={summary!.counts.notCaptured}
+                />
+              )}
+              {summary!.counts.unknownStatus > 0 && (
+                <StatTile
+                  label="Unsupported status"
+                  value={summary!.counts.unknownStatus}
+                />
+              )}
               <StatTile
                 label="Exceptions"
                 value={summary!.counts.ex01 + summary!.counts.ex02 + summary!.counts.ex03}
@@ -406,6 +423,11 @@ export function ReconciliationPage() {
                 segments={[
                   { label: "Resolved", value: summary!.counts.reconciled, color: "var(--color-success)" },
                   { label: "Settlement Pending", value: summary!.counts.settlementPending, color: "var(--color-warning)" },
+                  // DonutChart requires its segments to sum to the total
+                  // it draws, so a never-captured payment has to appear
+                  // here or the chart under-reports what was processed.
+                  { label: "Not Captured", value: summary!.counts.notCaptured, color: "var(--color-neutral)" },
+                  { label: "Unsupported Status", value: summary!.counts.unknownStatus, color: "var(--color-warning)" },
                   {
                     label: "Exceptions",
                     value: summary!.counts.ex01 + summary!.counts.ex02 + summary!.counts.ex03,
@@ -481,7 +503,7 @@ export function ReconciliationPage() {
               {
                 header: "Exception",
                 render: (row) =>
-                  row.status !== "RECONCILED" && row.status !== "SETTLEMENT_PENDING"
+                  isExceptionStatus(row.status)
                     ? exceptionCodeLabel(row.status)
                     : "—",
               },
@@ -510,6 +532,7 @@ export function ReconciliationPage() {
         onClose={() => setSelected(null)}
         result={selected}
         exceptionByPayment={exceptionByPayment}
+        source={summary?.source ?? source}
       />
 
       <FinancialGapBreakdown
@@ -522,6 +545,7 @@ export function ReconciliationPage() {
         categories={categoryImpacts}
         results={summary?.results ?? []}
         exceptionByPayment={exceptionByPayment}
+        source={summary?.source ?? source}
       />
     </div>
   );

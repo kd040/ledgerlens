@@ -230,6 +230,39 @@ def test_url_error_becomes_razorpay_api_error():
 # Source abstraction
 # --------------------------------------------------
 
+def test_normalize_payment_retains_the_real_created_at_instant():
+    """The transaction detail UI shows a Razorpay payment's actual
+    date/time, so normalization must carry the provider's own
+    created_at through as a real tz-aware instant -- never dropped, and
+    never replaced with an ingestion time."""
+    result = normalize_payment(RAW_PAYMENT)
+
+    assert result["created_at"] == datetime(
+        2019, 9, 5, 14, 9, 16, tzinfo=timezone.utc
+    )
+    assert result["created_at"] == datetime.fromtimestamp(
+        RAW_PAYMENT["created_at"], tz=timezone.utc
+    )
+    assert result["created_at"].tzinfo is not None
+    assert result["created_at"] != datetime.now(timezone.utc)
+
+
+def test_normalize_payment_preserves_a_non_captured_status():
+    """A payment the provider never captured must stay identifiable as
+    such after normalization -- the reconciliation engine relies on this
+    to avoid raising a false EX02 against it."""
+    raw = {**RAW_PAYMENT, "status": "created"}
+    assert normalize_payment(raw)["status"] == "created"
+
+
+def test_razorpay_source_is_identifiable_in_the_registry():
+    """The UI names a row's origin from the source key the run was made
+    with, so that key has to be a stable, registered identifier."""
+    assert "razorpay_test" in SOURCES
+    assert callable(SOURCES["razorpay_test"])
+    assert SOURCES["razorpay_test"] is not SOURCES["demo"]
+
+
 def test_sources_registry_has_demo_and_razorpay_test():
     assert set(SOURCES) == {"demo", "razorpay_test"}
 

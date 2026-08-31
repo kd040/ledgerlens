@@ -188,6 +188,10 @@ export function normalizeReconciliationResult(
     difference: toNumber(api.difference),
     settlementCount: api.settlement_count ?? null,
     paymentDate: api.payment_date ?? null,
+    paymentCreatedAt: api.payment_created_at
+      ? new Date(api.payment_created_at)
+      : null,
+    paymentStatus: api.payment_status ?? null,
   };
 }
 
@@ -252,6 +256,8 @@ export function normalizeRunSourceResponse(
       ex01: api.reconciliation.ex01,
       ex02: api.reconciliation.ex02,
       ex03: api.reconciliation.ex03,
+      notCaptured: api.reconciliation.not_captured ?? 0,
+      unknownStatus: api.reconciliation.unknown_status ?? 0,
     },
     financialImpact: toRequiredNumber(api.financial_impact),
     durationSeconds: api.duration_seconds,
@@ -282,6 +288,8 @@ export function normalizeReportSummary(api: ApiReportSummary): ReportSummary {
       duplicateSettlementValue: toRequiredNumber(fc.duplicate_settlement_value),
       unsettledPayments: fc.unsettled_payments,
       unsettledPaymentValue: toRequiredNumber(fc.unsettled_payment_value),
+      notCapturedPayments: fc.not_captured_payments,
+      notCapturedValue: toRequiredNumber(fc.not_captured_value),
     },
     exceptions: {
       total: api.exceptions.total,

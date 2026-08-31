@@ -61,6 +61,41 @@ export function exceptionCodeLabel(code: string): string {
   return category ? `${code} · ${category}` : code;
 }
 
+/** The two data sources in human terms -- shared so the Reconciliation
+ * page's source picker, the Overview, and the transaction detail drawer
+ * all name a source identically. */
+export const DATA_SOURCE_LABELS: Record<string, string> = {
+  demo: "Demo Dataset",
+  razorpay_test: "Razorpay Test Mode",
+};
+
+export function dataSourceLabel(source: string): string {
+  return DATA_SOURCE_LABELS[source] ?? source;
+}
+
+/** True for the reconciliation outcomes that are a genuine financial
+ * exception -- i.e. the ones with an exceptions row behind them and an
+ * investigation path. RECONCILED, SETTLEMENT_PENDING (normal lag),
+ * NOT_CAPTURED (never became money owed) and UNKNOWN_STATUS (provider
+ * status the engine does not recognise) are deliberately excluded:
+ * none of them creates an exception in the engine. */
+export function isExceptionStatus(status: string): boolean {
+  return status === "EX01" || status === "EX02" || status === "EX03";
+}
+
+/** The single definition of "gross processed": money that actually
+ * became owed to the merchant.
+ *
+ * A payment the provider never captured -- or one whose status the
+ * engine cannot classify -- is not processed value, so it must not
+ * inflate a financial total. This mirrors SETTLEABLE_PAYMENT_STATUSES
+ * in backend/app/reconciliation/engine.py, which is what the Reports
+ * module filters on, so Overview, Reconciliation and Reports all mean
+ * the same thing by the word "gross". */
+export function countsTowardGrossProcessed(status: string): boolean {
+  return status !== "NOT_CAPTURED" && status !== "UNKNOWN_STATUS";
+}
+
 export interface StatusPresentation {
   icon: string;
   label: string;
@@ -78,6 +113,10 @@ export function reconciliationStatusPresentation(
       return { icon: "🟢", label: "Resolved", tone: "success" };
     case "SETTLEMENT_PENDING":
       return { icon: "🟡", label: "Settlement Pending", tone: "warning" };
+    case "NOT_CAPTURED":
+      return { icon: "⚪", label: "Not Captured", tone: "neutral" };
+    case "UNKNOWN_STATUS":
+      return { icon: "⚠️", label: "Unsupported Status", tone: "warning" };
     case "EX01":
       return { icon: "🔴", label: "Amount Mismatch", tone: "danger" };
     case "EX02":

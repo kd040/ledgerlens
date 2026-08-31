@@ -71,7 +71,7 @@ function buildCsv(report: ReportSummary): string {
 
     ["Financial Control Summary", "Value", "Basis"],
     ["Total payments", fc.totalPayments, "Payment date"],
-    ["Total payment value", csvMoney(fc.totalPaymentValue), "Payment date"],
+    ["Gross processed", csvMoney(fc.totalPaymentValue), "Captured payments only"],
     ["Total settled value", csvMoney(fc.totalSettledValue), "Payment date"],
     ["Total fees", csvMoney(fc.totalFees), "Payment date"],
     ["Total taxes", csvMoney(fc.totalTaxes), "Payment date"],
@@ -95,7 +95,17 @@ function buildCsv(report: ReportSummary): string {
       "Payment date",
     ],
     ["Unsettled payments", fc.unsettledPayments, "Payment date"],
-    ["Unsettled payment value", csvMoney(fc.unsettledPaymentValue), "Payment date"],
+    [
+      "Unsettled payment value",
+      csvMoney(fc.unsettledPaymentValue),
+      "Captured, not yet settled",
+    ],
+    ["Never-captured payments", fc.notCapturedPayments, "Payment date"],
+    [
+      "Never-captured value",
+      csvMoney(fc.notCapturedValue),
+      "Excluded from exposure",
+    ],
     [
       "Exception exposure",
       csvMoney(exceptions.exceptionExposure),
@@ -314,8 +324,9 @@ export function ReportsPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               <StatTile label="Total payments" value={data.financialControl.totalPayments} />
               <StatTile
-                label="Total payment value"
+                label="Gross processed"
                 value={formatMoney(data.financialControl.totalPaymentValue)}
+                hint="Captured payments only"
               />
               <StatTile
                 label="Total settled value"

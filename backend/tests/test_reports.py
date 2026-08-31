@@ -26,6 +26,7 @@ from fastapi.testclient import TestClient
 
 from app.investigation.runners.deterministic import connect
 from app.main import app
+from app.reconciliation.engine import SETTLEABLE_PAYMENT_STATUSES
 from app.reports.store import (
     EXCEPTION_WORKFLOW_STATUSES,
     get_available_period,
@@ -65,7 +66,8 @@ def _recompute_from_source(cur) -> dict:
     own formula (gross - fees - taxes + adjustments), with no reference
     to app/reports/store.py's SQL."""
     cur.execute(
-        "select id, external_payment_id, amount from payments order by external_payment_id"
+        "select id, external_payment_id, amount, status from payments "
+        "order by external_payment_id"
     )
     payments = cur.fetchall()
 
@@ -84,9 +86,11 @@ def _recompute_from_source(cur) -> dict:
         "duplicate_amount": Decimal("0.00"),
         "unsettled_count": 0,
         "unsettled_amount": Decimal("0.00"),
+        "not_captured_count": 0,
+        "not_captured_amount": Decimal("0.00"),
     }
 
-    for _payment_id, reference, gross in payments:
+    for _payment_id, reference, gross, payment_status in payments:
         cur.execute(
             "select id, settlement_amount from settlements where reference = %s",
             (reference,),
@@ -112,11 +116,20 @@ def _recompute_from_source(cur) -> dict:
         expected = gross - fee - tax + adjustment
 
         totals["count"] += 1
-        totals["gross"] += gross
         totals["observed"] += observed
         totals["fees"] += fee
         totals["taxes"] += tax
         totals["adjustments"] += adjustment
+
+        # A payment that never became money owed is triaged on status
+        # first -- the same order the engine uses -- and contributes to
+        # no financial total but its own line.
+        if payment_status.lower() not in SETTLEABLE_PAYMENT_STATUSES:
+            totals["not_captured_count"] += 1
+            totals["not_captured_amount"] += gross
+            continue
+
+        totals["gross"] += gross
 
         if len(settlements) == 1:
             totals["expected_matched"] += expected
@@ -164,6 +177,10 @@ def test_financial_control_matches_independent_recomputation():
             assert (
                 Decimal(report["unsettled_payment_value"]) == expected["unsettled_amount"]
             )
+            assert report["not_captured_payments"] == expected["not_captured_count"]
+            assert (
+                Decimal(report["not_captured_value"]) == expected["not_captured_amount"]
+            )
 
 
 def test_financial_gap_equals_persisted_ex01_impact():
@@ -185,9 +202,13 @@ def test_financial_gap_equals_persisted_ex01_impact():
             )
 
 
-def test_unsettled_value_equals_persisted_ex02_impact():
-    """Same cross-check on the other side: EX02's persisted impact is the
-    full payment amount of every payment with no settlement."""
+def test_unsettled_value_decomposes_into_ex02_plus_still_pending():
+    """Every EX02's persisted impact is the full amount of a captured
+    payment with no settlement, so EX02 exposure is always *part* of the
+    unsettled value. The remainder is exactly the captured payments that
+    have no settlement yet and have not (yet) raised an exception --
+    normal settlement lag. Asserting the decomposition exactly keeps this
+    a real cross-check against the engine rather than a bound."""
     with connect() as conn:
         with conn.cursor() as cur:
             summary = get_report_summary(cur)
@@ -195,10 +216,103 @@ def test_unsettled_value_equals_persisted_ex02_impact():
                 item["code"]: Decimal(item["financial_impact"])
                 for item in summary["exceptions"]["by_code"]
             }
-
-            assert Decimal(
+            unsettled = Decimal(
                 summary["financial_control"]["unsettled_payment_value"]
-            ) == by_code["EX02"]
+            )
+
+            cur.execute(
+                """
+                select coalesce(sum(p.amount), 0)
+                from payments p
+                where lower(p.status) = any(%s)
+                  and not exists (
+                      select 1 from settlements s
+                      where s.reference = p.external_payment_id
+                  )
+                  and not exists (
+                      select 1 from exceptions e
+                      where e.description like '%%' || p.external_payment_id || '%%'
+                  )
+                """,
+                (sorted(SETTLEABLE_PAYMENT_STATUSES),),
+            )
+            still_pending = cur.fetchone()[0]
+
+            assert unsettled == by_code["EX02"] + still_pending
+            assert by_code["EX02"] <= unsettled
+
+
+def test_never_captured_payments_are_excluded_from_exposure():
+    """Money the provider never captured was never owed, so it must not
+    inflate unsettled exposure -- it is reported on its own line."""
+    with connect() as conn:
+        with conn.cursor() as cur:
+            report = get_report_summary(cur)["financial_control"]
+
+            cur.execute(
+                "select count(*), coalesce(sum(amount), 0) from payments "
+                "where lower(status) <> all(%s)",
+                (sorted(SETTLEABLE_PAYMENT_STATUSES),),
+            )
+            count, amount = cur.fetchone()
+
+            assert report["not_captured_payments"] == count
+            assert Decimal(report["not_captured_value"]) == amount
+
+            # The unsettled figure must be exactly the captured payments
+            # with no settlement -- never-captured ones excluded.
+            cur.execute(
+                """
+                select coalesce(sum(amount), 0)
+                from payments
+                where lower(status) = any(%s)
+                  and not exists (
+                      select 1 from settlements s
+                      where s.reference = payments.external_payment_id
+                  )
+                """,
+                (sorted(SETTLEABLE_PAYMENT_STATUSES),),
+            )
+            assert Decimal(report["unsettled_payment_value"]) == cur.fetchone()[0]
+
+
+def test_gross_processed_counts_only_captured_payments():
+    """The canonical financial definition, asserted directly: gross
+    processed is the value of payments that actually became money owed.
+    This is the same rule countsTowardGrossProcessed applies on the
+    frontend, which is what makes Overview/Reconciliation and Reports
+    agree on one dataset."""
+    with connect() as conn:
+        with conn.cursor() as cur:
+            report = get_report_summary(cur)["financial_control"]
+
+            cur.execute(
+                "select coalesce(sum(amount), 0) from payments "
+                "where lower(status) = any(%s)",
+                (sorted(SETTLEABLE_PAYMENT_STATUSES),),
+            )
+            captured_value = cur.fetchone()[0]
+
+            cur.execute(
+                "select coalesce(sum(amount), 0) from payments "
+                "where lower(status) <> all(%s)",
+                (sorted(SETTLEABLE_PAYMENT_STATUSES),),
+            )
+            uncaptured_value = cur.fetchone()[0]
+
+            assert Decimal(report["total_payment_value"]) == captured_value
+            assert Decimal(report["not_captured_value"]) == uncaptured_value
+
+            # And the two buckets partition every payment on file.
+            cur.execute("select coalesce(sum(amount), 0) from payments")
+            assert captured_value + uncaptured_value == cur.fetchone()[0]
+
+
+def test_created_authorized_failed_and_unknown_are_all_excluded_from_gross():
+    """Each non-captured state is excluded for the same reason, so none
+    of them can quietly start counting as processed value."""
+    for status in ("created", "authorized", "failed", "some_unknown_state"):
+        assert status not in SETTLEABLE_PAYMENT_STATUSES
 
 
 def test_exception_counts_match_the_exceptions_table():

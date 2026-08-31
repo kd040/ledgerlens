@@ -9,6 +9,58 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+# Every payment status this engine knows how to reason about, compared
+# case-insensitively (the demo dataset stores 'CAPTURED', Razorpay
+# reports 'captured').
+#
+# SETTLEABLE: the payment became money owed to the merchant, so a
+# settlement is genuinely expected and its absence is an EX02.
+#
+# NON_SETTLEABLE: the payment never became money owed -- started,
+# held, or declined -- so no settlement is ever due and calling it a
+# "Missing Record" would invent an exception out of nothing.
+#
+# Anything in neither set is UNKNOWN. It is deliberately NOT assumed to
+# be either: a status this engine has never seen might be settleable
+# (silently suppressing a real EX02) or might not be (inventing a false
+# one). Both guesses are wrong in a way that costs money, so an unknown
+# status becomes its own visible, unreconciled outcome that a human has
+# to classify -- see UNKNOWN_STATUS below.
+SETTLEABLE_PAYMENT_STATUSES = {"captured", "refunded"}
+NON_SETTLEABLE_PAYMENT_STATUSES = {"created", "authorized", "failed"}
+
+# Indian banking time. Settlement cycles are quoted in banking days, so
+# whether a given instant falls on a working day is an IST question, not
+# a UTC one -- a payment at 02:00 IST Monday is 20:30 UTC Sunday, and
+# counting that as a weekend would push its deadline out by a day.
+_IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def add_business_days(start: datetime, days: int) -> datetime:
+    """`start` plus `days` banking days, weekends excluded.
+
+    Friday + 2 -> Tuesday; Monday + 2 -> Wednesday. Saturday/Sunday are
+    skipped rather than counted.
+
+    ponytail: weekends only -- bank and exchange holidays are NOT
+    modelled, because this project has no holiday calendar and inventing
+    one (or taking a dependency for it) would be guessing at a
+    jurisdiction. A payment captured before a long public holiday can
+    therefore be flagged EX02 slightly early. Add a real holiday
+    calendar here if that false positive shows up in practice.
+    """
+    if days <= 0:
+        return start
+
+    result = start
+    remaining = days
+    while remaining > 0:
+        result += timedelta(days=1)
+        if result.astimezone(_IST).weekday() < 5:  # Mon-Fri
+            remaining -= 1
+    return result
+
+
 def create_exception(
     cur,
     code: str,
@@ -79,7 +131,7 @@ values (%s, %s, %s, %s, %s, 'CONFIRMED', %s)
 
 def reconcile_payments(
     payment_ids: list[str] | None = None,
-    settlement_pending_window: timedelta | None = None,
+    settlement_pending_business_days: int | None = None,
 ) -> list[dict]:
     """Reconciles payments against settlements.
 
@@ -89,16 +141,17 @@ def reconcile_payments(
     those payments -- e.g. the set a data source just fetched for a
     requested period -- without touching unrelated rows.
 
-    settlement_pending_window is optional and provider-agnostic: omit it
-    (the default) and a missing settlement is EX02 immediately, exactly
-    as before -- this is what the demo/eval dataset and the unscoped
-    endpoint always use, so their output is untouched bit-for-bit. Pass
-    a timedelta to give a payment a grace period: if no settlement
-    exists yet AND the payment is younger than this window, it's
-    SETTLEMENT_PENDING instead of EX02 (normal settlement lag, not a
-    genuinely missing record). A payment older than the window with no
-    settlement is still EX02. Callers own the window's value and its
-    justification -- the engine only compares an age to a duration.
+    settlement_pending_business_days is optional and provider-agnostic:
+    omit it (the default) and a missing settlement is EX02 immediately,
+    exactly as before -- this is what the demo/eval dataset and the
+    unscoped endpoint always use, so their output is untouched
+    bit-for-bit. Pass a number of BANKING days to give a payment a grace
+    period: if no settlement exists yet AND the payment's settlement
+    deadline (see add_business_days) has not passed, it's
+    SETTLEMENT_PENDING instead of EX02 -- normal settlement lag, not a
+    genuinely missing record. Past the deadline with no settlement is
+    still EX02. Callers own the number and its justification; the engine
+    owns only the banking-day arithmetic.
     """
     database_url = os.getenv("SUPABASE_DB_URL")
 
@@ -118,7 +171,8 @@ def reconcile_payments(
                         p.external_payment_id,
                         p.amount,
                         p.currency,
-                        p.created_at
+                        p.created_at,
+                        p.status
                     from payments p
                     order by p.external_payment_id
                     """
@@ -131,7 +185,8 @@ def reconcile_payments(
                         p.external_payment_id,
                         p.amount,
                         p.currency,
-                        p.created_at
+                        p.created_at,
+                        p.status
                     from payments p
                     where p.external_payment_id = any(%s)
                     order by p.external_payment_id
@@ -141,13 +196,70 @@ def reconcile_payments(
 
             payments = cur.fetchall()
 
-            for payment_id, payment_ref, payment_amount, currency, payment_created_at in payments:
+            for (
+                payment_id,
+                payment_ref,
+                payment_amount,
+                currency,
+                payment_created_at,
+                payment_status,
+            ) in payments:
 
                 payment_date = (
                     payment_created_at.date().isoformat()
                     if payment_created_at is not None
                     else None
                 )
+
+                # Carried on every result row so a caller can show when a
+                # payment actually happened and what state the provider
+                # says it is in -- `payment_date` stays the IST-day label
+                # the daily trends bucket by, unchanged.
+                payment_context = {
+                    "payment_date": payment_date,
+                    "payment_created_at": (
+                        payment_created_at.isoformat()
+                        if payment_created_at is not None
+                        else None
+                    ),
+                    "payment_status": payment_status,
+                }
+
+                # --------------------------------------------------
+                # Payment status triage
+                # --------------------------------------------------
+
+                normalized_status = (
+                    payment_status.lower() if payment_status is not None else None
+                )
+
+                if normalized_status in NON_SETTLEABLE_PAYMENT_STATUSES:
+                    print(f"{payment_ref}: NOT_CAPTURED ({payment_status})")
+                    results.append({
+                        "payment": payment_ref,
+                        "status": "NOT_CAPTURED",
+                        "category": "Not Captured",
+                        "gross_amount": str(payment_amount),
+                        **payment_context,
+                    })
+
+                    continue
+
+                if normalized_status not in SETTLEABLE_PAYMENT_STATUSES:
+                    # Neither known-settleable nor known-non-settleable.
+                    # Reconciling it either way would be a guess, so it
+                    # stops here: no settlement lookup, no exception, and
+                    # a status a human can see and act on.
+                    print(f"{payment_ref}: UNKNOWN_STATUS ({payment_status})")
+                    results.append({
+                        "payment": payment_ref,
+                        "status": "UNKNOWN_STATUS",
+                        "category": "Unsupported Payment Status",
+                        "gross_amount": str(payment_amount),
+                        **payment_context,
+                    })
+
+                    continue
 
                 cur.execute(
                     """
@@ -170,10 +282,12 @@ def reconcile_payments(
 
                 if not settlements:
                     if (
-                        settlement_pending_window is not None
+                        settlement_pending_business_days is not None
                         and payment_created_at is not None
-                        and datetime.now(timezone.utc) - payment_created_at
-                        < settlement_pending_window
+                        and datetime.now(timezone.utc)
+                        < add_business_days(
+                            payment_created_at, settlement_pending_business_days
+                        )
                     ):
                         print(f"{payment_ref}: SETTLEMENT_PENDING")
                         results.append({
@@ -181,7 +295,7 @@ def reconcile_payments(
                             "status": "SETTLEMENT_PENDING",
                             "category": "Settlement Pending",
                             "gross_amount": str(payment_amount),
-                            "payment_date": payment_date,
+                            **payment_context,
                         })
                         continue
 
@@ -191,7 +305,7 @@ def reconcile_payments(
                         "status": "EX02",
                         "category": "Missing Record",
                         "gross_amount": str(payment_amount),
-                        "payment_date": payment_date,
+                        **payment_context,
                     })
 
                     create_exception(
@@ -264,7 +378,7 @@ def reconcile_payments(
                         "tax_amount": str(total_tax),
                         "adjustment_amount": str(total_adjustment),
                         "observed_amount": str(total_observed),
-                        "payment_date": payment_date,
+                        **payment_context,
                     })
 
                     create_exception(
@@ -362,7 +476,7 @@ def reconcile_payments(
                         "expected_amount": str(expected_amount),
                         "observed_amount": str(settlement_amount),
                         "difference": "0.00",
-                        "payment_date": payment_date,
+                        **payment_context,
                     })
 
                     continue
@@ -415,7 +529,7 @@ def reconcile_payments(
                     "expected_amount": str(expected_amount),
                     "observed_amount": str(settlement_amount),
                     "difference": str(difference),
-                    "payment_date": payment_date,
+                    **payment_context,
                 })
                 create_exception(
                     cur,

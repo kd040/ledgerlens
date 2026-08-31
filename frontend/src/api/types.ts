@@ -134,6 +134,13 @@ export interface ApiReconciliationResultRow {
   difference?: string;
   settlement_count?: number;
   payment_date?: string | null;
+  /** Full ISO instant the payment was created, straight from the
+   * provider (Razorpay's own `created_at`, see
+   * backend/app/datasources/razorpay/normalize.py). `payment_date` is
+   * the IST-day label; this is the actual timestamp. */
+  payment_created_at?: string | null;
+  /** The provider's own payment status ("captured", "created", ...). */
+  payment_status?: string | null;
 }
 
 export interface ApiReconciliationRunResponse {
@@ -199,6 +206,8 @@ export interface ApiRunSourceResponse {
     ex01: number;
     ex02: number;
     ex03: number;
+    not_captured: number;
+    unknown_status: number;
   };
   financial_impact: string;
   duration_seconds: number;
@@ -223,6 +232,8 @@ export interface ApiReportFinancialControl {
   duplicate_settlement_value: string;
   unsettled_payments: number;
   unsettled_payment_value: string;
+  not_captured_payments: number;
+  not_captured_value: string;
 }
 
 export interface ApiReportExceptionCode {

@@ -1,5 +1,5 @@
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -42,12 +42,9 @@ def run_source(body: RunSourceRequest) -> dict[str, Any]:
     except RazorpayApiError as error:
         raise HTTPException(status_code=502, detail=str(error))
 
-    pending_days = fetch_result.get("settlement_pending_days")
-    pending_window = timedelta(days=pending_days) if pending_days is not None else None
-
     reconciliation_results = reconcile_payments(
         payment_ids=fetch_result["payment_ids"],
-        settlement_pending_window=pending_window,
+        settlement_pending_business_days=fetch_result.get("settlement_pending_days"),
     )
 
     counts = {
@@ -56,6 +53,11 @@ def run_source(body: RunSourceRequest) -> dict[str, Any]:
         "ex02": 0,
         "ex03": 0,
         "settlement_pending": 0,
+        # A payment the provider never captured -- counted so the buckets
+        # still add up to records_processed, never folded into exceptions.
+        "not_captured": 0,
+        # A payment whose provider status this engine does not recognise.
+        "unknown_status": 0,
     }
     financial_impact = Decimal("0.00")
     for row in reconciliation_results:
