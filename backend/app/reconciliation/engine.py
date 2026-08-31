@@ -62,71 +62,120 @@ def add_business_days(start: datetime, days: int) -> datetime:
 
 
 def create_exception(
-    cur,
+    pending: list,
     code: str,
     category: str,
     description: str,
     financial_impact: Decimal | None,
 ) -> None:
+    """Buffers one exception for the bulk insert at the end of the run.
+
+    Writing these one-per-payment cost a database round trip each; see
+    the note on reconcile_payments. Buffering changes nothing
+    semantically: nothing in the loop reads back the rows it writes, and
+    the single commit at the end is unchanged."""
+    pending.append((code, category, description, financial_impact))
+
+
+def _flush_exceptions(cur, pending: list) -> None:
+    if not pending:
+        return
+
+    values = ", ".join(["(%s, %s, %s, %s, 'OPEN')"] * len(pending))
     cur.execute(
-        """
+        f"""
         insert into exceptions (
-        exception_code,
-        category,
-        description,
-        financial_impact,
-        status
-    )
-    values (%s, %s, %s, %s, 'OPEN')
-    on conflict (exception_code, description) do nothing
+            exception_code, category, description, financial_impact, status
+        )
+        values {values}
+        on conflict (exception_code, description) do nothing
         """,
-        (
-            code,
-            category,
-            description,
-            financial_impact,
-        ),
+        [field for row in pending for field in row],
     )
 
 
 def create_reconciliation_link(
-    cur,
+    pending: list,
     source_type: str,
     source_id,
     target_type: str,
-    target_id,
+    target_id: str,
     relationship_type: str,
     confidence: Decimal,
 ) -> None:
+    """Buffers one reconciliation link -- see create_exception."""
+    pending.append(
+        (source_type, source_id, target_type, target_id, relationship_type, confidence)
+    )
+
+
+def _flush_reconciliation_links(cur, pending: list) -> None:
+    if not pending:
+        return
+
+    values = ", ".join(["(%s, %s, %s, %s, %s, 'CONFIRMED', %s)"] * len(pending))
+    cur.execute(
+        f"""
+        insert into reconciliation_links (
+            source_type, source_id, target_type, target_id,
+            relationship_type, status, confidence
+        )
+        values {values}
+        on conflict (
+            source_type, source_id, target_type, target_id, relationship_type
+        ) do nothing
+        """,
+        [field for row in pending for field in row],
+    )
+
+
+def _load_settlement_inputs(cur, payment_refs: list[str]) -> tuple[dict, dict]:
+    """Every settlement for the payments being reconciled, plus each
+    settlement's fee/tax/adjustment totals -- in four statements rather
+    than four per payment.
+
+    The `.get(settlement_id, Decimal(0))` default in the caller is
+    load-bearing: the per-settlement query this replaces used
+    `coalesce(sum(amount), 0)`, which yields a scale-0 Decimal("0") when
+    a settlement has no rows in that table and a scale-2 Decimal("0.00")
+    when it has rows summing to zero. Those render as "0" and "0.00"
+    respectively in the result payload, so the default has to be
+    Decimal(0) to keep the output byte-identical.
+    """
     cur.execute(
         """
-        insert into reconciliation_links (
-    source_type,
-    source_id,
-    target_type,
-    target_id,
-    relationship_type,
-    status,
-    confidence
-)
-values (%s, %s, %s, %s, %s, 'CONFIRMED', %s)
-    on conflict (
-    source_type,
-    source_id,
-    target_type,
-    target_id,
-    relationship_type
-) do nothing
-    """,
-        (
-            source_type,
-            source_id,
-            target_type,
-            target_id,
-            relationship_type,
-            confidence,
-        ),
+        select s.reference, s.id, s.external_settlement_id, s.settlement_amount
+        from settlements s
+        where s.reference = any(%s)
+        order by s.reference, s.external_settlement_id
+        """,
+        (payment_refs,),
     )
+
+    settlements_by_reference: dict[str, list] = {}
+    settlement_ids: list = []
+    for reference, settlement_id, external_id, amount in cur.fetchall():
+        settlements_by_reference.setdefault(reference, []).append(
+            (settlement_id, external_id, amount)
+        )
+        settlement_ids.append(settlement_id)
+
+    # Fixed table names, never user input -- interpolated only because a
+    # table name cannot be a bound parameter.
+    totals: dict[str, dict] = {}
+    for table in ("fees", "taxes", "adjustments"):
+        cur.execute(
+            f"""
+            select settlement_id, coalesce(sum(amount), 0)
+            from {table}
+            where settlement_id = any(%s)
+            group by settlement_id
+            """,
+            (settlement_ids,),
+        )
+        totals[table] = dict(cur.fetchall())
+
+    return settlements_by_reference, totals
 
 
 def reconcile_payments(
@@ -196,6 +245,18 @@ def reconcile_payments(
 
             payments = cur.fetchall()
 
+            # Everything the loop needs, fetched up front. Reconciling
+            # 100 payments used to cost ~530 round trips (settlements,
+            # fees, taxes, adjustments and one link insert each); nearly
+            # all of the endpoint's wall time was network latency to the
+            # database, which is what made it exceed the deployment's
+            # request timeout. It is a handful of statements now.
+            settlements_by_reference, settlement_totals = _load_settlement_inputs(
+                cur, [row[1] for row in payments]
+            )
+            pending_links: list = []
+            pending_exceptions: list = []
+
             for (
                 payment_id,
                 payment_ref,
@@ -261,20 +322,7 @@ def reconcile_payments(
 
                     continue
 
-                cur.execute(
-                    """
-                    select
-                        s.id,
-                        s.external_settlement_id,
-                        s.settlement_amount
-                    from settlements s
-                    where s.reference = %s
-                    order by s.external_settlement_id
-                    """,
-                    (payment_ref,),
-                )
-
-                settlements = cur.fetchall()
+                settlements = settlements_by_reference.get(payment_ref, [])
 
                 # --------------------------------------------------
                 # Missing settlement
@@ -309,7 +357,7 @@ def reconcile_payments(
                     })
 
                     create_exception(
-                        cur,
+                        pending_exceptions,
                         "EX02",
                         "Missing Record",
                         f"No settlement found for payment {payment_ref}.",
@@ -339,7 +387,7 @@ def reconcile_payments(
 
                     for settlement_id, settlement_ref, settlement_amount in settlements:
                         create_reconciliation_link(
-                            cur,
+                            pending_links,
                             "payment",
                             payment_id,
                             "settlement",
@@ -348,23 +396,15 @@ def reconcile_payments(
                             Decimal("100.00"),
                         )
 
-                        cur.execute(
-                            "select coalesce(sum(amount), 0) from fees where settlement_id = %s",
-                            (settlement_id,),
+                        total_fee += settlement_totals["fees"].get(
+                            settlement_id, Decimal(0)
                         )
-                        total_fee += cur.fetchone()[0]
-
-                        cur.execute(
-                            "select coalesce(sum(amount), 0) from taxes where settlement_id = %s",
-                            (settlement_id,),
+                        total_tax += settlement_totals["taxes"].get(
+                            settlement_id, Decimal(0)
                         )
-                        total_tax += cur.fetchone()[0]
-
-                        cur.execute(
-                            "select coalesce(sum(amount), 0) from adjustments where settlement_id = %s",
-                            (settlement_id,),
+                        total_adjustment += settlement_totals["adjustments"].get(
+                            settlement_id, Decimal(0)
                         )
-                        total_adjustment += cur.fetchone()[0]
 
                         total_observed += settlement_amount
 
@@ -382,7 +422,7 @@ def reconcile_payments(
                     })
 
                     create_exception(
-                        cur,
+                        pending_exceptions,
                         "EX03",
                         "Duplicate Record",
                         (
@@ -401,7 +441,7 @@ def reconcile_payments(
                 settlement_id, settlement_ref, settlement_amount = settlements[0]
 
                 create_reconciliation_link(
-                    cur,
+                    pending_links,
                     "payment",
                     payment_id,
                     "settlement",
@@ -410,41 +450,13 @@ def reconcile_payments(
                     Decimal("100.00"),
                 )
 
-                # Fees
-                cur.execute(
-                    """
-                    select coalesce(sum(amount), 0)
-                    from fees
-                    where settlement_id = %s
-                    """,
-                    (settlement_id,),
+                # Decimal(0), not Decimal("0.00") -- see _load_settlement_inputs
+                # for why the scale of the default matters.
+                fee_amount = settlement_totals["fees"].get(settlement_id, Decimal(0))
+                tax_amount = settlement_totals["taxes"].get(settlement_id, Decimal(0))
+                adjustment_amount = settlement_totals["adjustments"].get(
+                    settlement_id, Decimal(0)
                 )
-
-                fee_amount = cur.fetchone()[0]
-
-                # Taxes
-                cur.execute(
-                    """
-                    select coalesce(sum(amount), 0)
-                    from taxes
-                    where settlement_id = %s
-                    """,
-                    (settlement_id,),
-                )
-
-                tax_amount = cur.fetchone()[0]
-
-                # Adjustments
-                cur.execute(
-                    """
-                    select coalesce(sum(amount), 0)
-                    from adjustments
-                    where settlement_id = %s
-                    """,
-                    (settlement_id,),
-                )
-
-                adjustment_amount = cur.fetchone()[0]
 
                 expected_amount = (
                     payment_amount
@@ -532,12 +544,15 @@ def reconcile_payments(
                     **payment_context,
                 })
                 create_exception(
-                    cur,
+                    pending_exceptions,
                     "EX01",
                     category,
                     description,
                     difference,
                 )
+
+            _flush_reconciliation_links(cur, pending_links)
+            _flush_exceptions(cur, pending_exceptions)
 
         conn.commit()
     return results

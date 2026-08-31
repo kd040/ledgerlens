@@ -10,6 +10,8 @@ Run directly: python backend/tests/test_reconciliation_engine.py
 
 import sys
 from collections import Counter
+
+import psycopg
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -520,6 +522,78 @@ def test_supported_statuses_keep_their_existing_behaviour():
                 with conn.cursor() as cur:
                     _cleanup(cur, [ref], [])
                 conn.commit()
+
+
+# ------------------------------------------------------------------
+# Query volume (production timeout regression)
+# ------------------------------------------------------------------
+
+
+def test_reconciliation_does_not_issue_a_query_per_payment():
+    """The bug this guards: reconcile_payments used to run a settlement
+    lookup, three sum() queries and a link insert *per payment* -- ~530
+    round trips for the 100-record dataset. Every one of those is a
+    network hop to a hosted database, so the endpoint took ~21s locally
+    and longer from the deployment, exceeding the platform's request
+    timeout and returning 502 before it could respond.
+
+    Wall-clock is not asserted (it depends on where the database is);
+    the round-trip *count* is the thing that must stay bounded, and it
+    must not scale with the number of payments.
+    """
+    executed: list[str] = []
+    original = psycopg.Cursor.execute
+
+    def counting_execute(self, query, params=None, **kwargs):
+        executed.append(" ".join(str(query).split())[:60])
+        return original(self, query, params, **kwargs)
+
+    payment_ids = run_demo_source(
+        datetime.now(timezone.utc) - timedelta(days=1), datetime.now(timezone.utc)
+    )["payment_ids"]
+    assert len(payment_ids) == 100
+
+    psycopg.Cursor.execute = counting_execute
+    try:
+        results = reconcile_payments(payment_ids=payment_ids)
+    finally:
+        psycopg.Cursor.execute = original
+
+    assert len(results) == 100
+    # One payments select, one settlements select, three per-table sum
+    # rollups, and one bulk insert each for links and exceptions.
+    assert len(executed) <= 12, (
+        f"{len(executed)} round trips for 100 payments -- a per-payment "
+        f"query has been reintroduced:\n" + "\n".join(executed[:15])
+    )
+
+
+def test_query_count_stays_flat_as_payment_count_grows():
+    """The count must be independent of dataset size -- that is what
+    distinguishes a fixed set of bulk statements from an N+1."""
+    original = psycopg.Cursor.execute
+
+    def measure(payment_ids):
+        executed = []
+
+        def counting_execute(self, query, params=None, **kwargs):
+            executed.append(1)
+            return original(self, query, params, **kwargs)
+
+        psycopg.Cursor.execute = counting_execute
+        try:
+            reconcile_payments(payment_ids=payment_ids)
+        finally:
+            psycopg.Cursor.execute = original
+        return len(executed)
+
+    all_ids = run_demo_source(
+        datetime.now(timezone.utc) - timedelta(days=1), datetime.now(timezone.utc)
+    )["payment_ids"]
+
+    assert measure(all_ids[:10]) == measure(all_ids), (
+        "round trips scale with payment count -- the N+1 is back"
+    )
 
 
 if __name__ == "__main__":
