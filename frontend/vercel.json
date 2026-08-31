@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://ledgerlens-api-01sp.onrender.com/:path*" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}
