@@ -7,6 +7,7 @@ import { InvestigationsListPage } from "./pages/InvestigationsListPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ReconciliationPage } from "./pages/ReconciliationPage";
+import { ReportsPage } from "./pages/ReportsPage";
 import { SignupPage } from "./pages/SignupPage";
 import { EvidenceTab } from "./pages/investigation/EvidenceTab";
 import { FinancialsTab } from "./pages/investigation/FinancialsTab";
@@ -40,7 +41,7 @@ function App() {
             path="transactions"
             element={<ComingSoonPage title="Transactions" />}
           />
-          <Route path="reports" element={<ComingSoonPage title="Reports" />} />
+          <Route path="reports" element={<ReportsPage />} />
           <Route path="*" element={<Navigate to="/overview" replace />} />
         </Route>
       </Route>

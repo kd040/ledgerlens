@@ -31,9 +31,7 @@ interface NavGroup {
 }
 
 /** The application shell's nav tree, grouped exactly as the product
- * information architecture: one destination per real page. Reports has
- * no backing page yet, so it stays an inert "Soon" link rather than
- * promising a feature that isn't built. There is no separate
+ * information architecture: one destination per real page. There is no separate
  * "Transactions" destination -- transaction-level detail already lives
  * on Reconciliation and the Financial Impact drill-down, so a nav item
  * pointing at a Coming Soon page here would only dead-end next to a
@@ -53,7 +51,7 @@ const NAV_TREE: NavGroup[] = [
   },
   {
     label: "Insights",
-    items: [{ label: "Reports", to: "/reports", icon: ChartNoAxesCombined, comingSoon: true }],
+    items: [{ label: "Reports", to: "/reports", icon: ChartNoAxesCombined }],
   },
 ];
 

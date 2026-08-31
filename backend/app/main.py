@@ -10,6 +10,7 @@ from app.db.database import check_database_connection
 from app.exceptions.router import router as exceptions_router
 from app.investigation.router import router as investigations_router
 from app.reconciliation.engine import reconcile_payments
+from app.reports.router import router as reports_router
 
 
 app = FastAPI(
@@ -33,6 +34,7 @@ app.include_router(auth_router)
 app.include_router(investigations_router)
 app.include_router(exceptions_router)
 app.include_router(datasources_router)
+app.include_router(reports_router)
 
 
 @app.get("/health")

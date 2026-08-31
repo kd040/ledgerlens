@@ -16,6 +16,7 @@ import type {
   ApiInvestigationDetail,
   ApiInvestigationSummary,
   ApiReconciliationResultRow,
+  ApiReportSummary,
   ApiRootCauseAssessment,
   ApiRunSourceResponse,
   ApiToolCall,
@@ -38,6 +39,7 @@ import type {
   ReconciliationResult,
   ReconciliationRunSummary,
   ReconciliationStatus,
+  ReportSummary,
   RootCauseAssessment,
   ToolCall,
 } from "./types";
@@ -254,5 +256,64 @@ export function normalizeRunSourceResponse(
     financialImpact: toRequiredNumber(api.financial_impact),
     durationSeconds: api.duration_seconds,
     results: api.results.map(normalizeReconciliationResult),
+  };
+}
+
+/** The report's status/decision maps arrive as objects so the backend
+ * owns which buckets exist and in what order; they become arrays here
+ * so components render them without re-deciding that order. */
+export function normalizeReportSummary(api: ApiReportSummary): ReportSummary {
+  const fc = api.financial_control;
+  return {
+    period: api.period,
+    availablePeriod: api.available_period,
+    financialControl: {
+      totalPayments: fc.total_payments,
+      totalPaymentValue: toRequiredNumber(fc.total_payment_value),
+      totalSettledValue: toRequiredNumber(fc.total_settled_value),
+      totalFees: toRequiredNumber(fc.total_fees),
+      totalTaxes: toRequiredNumber(fc.total_taxes),
+      totalAdjustments: toRequiredNumber(fc.total_adjustments),
+      expectedSettlementValue: toRequiredNumber(fc.expected_settlement_value),
+      totalFinancialGap: toRequiredNumber(fc.total_financial_gap),
+      reconciledPayments: fc.reconciled_payments,
+      reconciledAmount: toRequiredNumber(fc.reconciled_amount),
+      duplicateSettledPayments: fc.duplicate_settled_payments,
+      duplicateSettlementValue: toRequiredNumber(fc.duplicate_settlement_value),
+      unsettledPayments: fc.unsettled_payments,
+      unsettledPaymentValue: toRequiredNumber(fc.unsettled_payment_value),
+    },
+    exceptions: {
+      total: api.exceptions.total,
+      byCode: api.exceptions.by_code.map((row) => ({
+        code: row.code,
+        label: row.label,
+        count: row.count,
+        financialImpact: toRequiredNumber(row.financial_impact),
+      })),
+      byStatus: Object.entries(api.exceptions.by_status).map(
+        ([status, count]) => ({ status, count }),
+      ),
+      exceptionExposure: toRequiredNumber(api.exceptions.exception_exposure),
+    },
+    investigations: {
+      total: api.investigations.total,
+      aiInvestigations: api.investigations.ai_investigations,
+      awaitingHumanReview: api.investigations.awaiting_human_review,
+      resolved: api.investigations.resolved,
+      escalated: api.investigations.escalated,
+      inProgress: api.investigations.in_progress,
+      resolutionRate: api.investigations.resolution_rate,
+      escalationRate: api.investigations.escalation_rate,
+    },
+    ai: {
+      investigationCount: api.ai.investigation_count,
+      averageConfidence: toNumber(api.ai.average_confidence),
+      humanReviewCount: api.ai.human_review_count,
+      humanDecisions: Object.entries(api.ai.human_decisions).map(
+        ([decision, count]) => ({ decision, count }),
+      ),
+      rootCauseCategories: api.ai.root_cause_categories,
+    },
   };
 }

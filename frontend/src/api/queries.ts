@@ -8,6 +8,7 @@ import { authApi } from "./auth";
 import { exceptionsApi } from "./exceptions";
 import { investigationsApi } from "./investigations";
 import { reconciliationApi, type RunSourceParams } from "./reconciliation";
+import { reportsApi } from "./reports";
 import { ApiError } from "./client";
 import {
   normalizeContradiction,
@@ -19,6 +20,7 @@ import {
   normalizeInvestigationDailyFinancials,
   normalizeInvestigationDetail,
   normalizeInvestigationSummary,
+  normalizeReportSummary,
   normalizeRunSourceResponse,
   normalizeToolCall,
 } from "../domain/normalize";
@@ -322,6 +324,27 @@ export function useStartInvestigation() {
       queryClient.invalidateQueries({ queryKey: exceptionKeys.all });
       queryClient.invalidateQueries({ queryKey: investigationKeys.all });
     },
+  });
+}
+
+export const reportKeys = {
+  summary: (start: string | null, end: string | null) =>
+    ["reports", "summary", start, end] as const,
+};
+
+/** The whole Reports page in one request -- read-only aggregates over
+ * data the reconciliation and investigation flows already persisted, so
+ * it never triggers a reconciliation run of its own. */
+export function useReportSummary(
+  start: string | null,
+  end: string | null,
+) {
+  return useQuery({
+    queryKey: reportKeys.summary(start, end),
+    queryFn: async () =>
+      normalizeReportSummary(
+        await reportsApi.summary(start ?? undefined, end ?? undefined),
+      ),
   });
 }
 

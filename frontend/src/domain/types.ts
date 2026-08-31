@@ -191,3 +191,64 @@ export interface ReconciliationRunSummary {
   durationSeconds: number;
   results: ReconciliationResult[];
 }
+
+/** The Reports page's single payload, money already parsed to numbers.
+ * Mirrors backend/app/reports/store.py section for section. */
+export interface ReportFinancialControl {
+  totalPayments: number;
+  totalPaymentValue: number;
+  totalSettledValue: number;
+  totalFees: number;
+  totalTaxes: number;
+  totalAdjustments: number;
+  expectedSettlementValue: number;
+  totalFinancialGap: number;
+  reconciledPayments: number;
+  reconciledAmount: number;
+  duplicateSettledPayments: number;
+  duplicateSettlementValue: number;
+  unsettledPayments: number;
+  unsettledPaymentValue: number;
+}
+
+export interface ReportExceptionCode {
+  code: string;
+  label: string;
+  count: number;
+  financialImpact: number;
+}
+
+export interface ReportExceptions {
+  total: number;
+  byCode: ReportExceptionCode[];
+  byStatus: { status: string; count: number }[];
+  exceptionExposure: number;
+}
+
+export interface ReportInvestigations {
+  total: number;
+  aiInvestigations: number;
+  awaitingHumanReview: number;
+  resolved: number;
+  escalated: number;
+  inProgress: number;
+  resolutionRate: number;
+  escalationRate: number;
+}
+
+export interface ReportAiInsights {
+  investigationCount: number;
+  averageConfidence: number | null;
+  humanReviewCount: number;
+  humanDecisions: { decision: string; count: number }[];
+  rootCauseCategories: { category: string; count: number }[];
+}
+
+export interface ReportSummary {
+  period: { start: string | null; end: string | null };
+  availablePeriod: { start: string | null; end: string | null };
+  financialControl: ReportFinancialControl;
+  exceptions: ReportExceptions;
+  investigations: ReportInvestigations;
+  ai: ReportAiInsights;
+}

@@ -204,3 +204,65 @@ export interface ApiRunSourceResponse {
   duration_seconds: number;
   results: ApiReconciliationResultRow[];
 }
+
+/** GET /reports/summary -- one aggregated Finance Controller payload
+ * (see backend/app/reports/store.py). Every money field is a Decimal
+ * string, as everywhere else; rates are already-rounded percentages. */
+export interface ApiReportFinancialControl {
+  total_payments: number;
+  total_payment_value: string;
+  total_settled_value: string;
+  total_fees: string;
+  total_taxes: string;
+  total_adjustments: string;
+  expected_settlement_value: string;
+  total_financial_gap: string;
+  reconciled_payments: number;
+  reconciled_amount: string;
+  duplicate_settled_payments: number;
+  duplicate_settlement_value: string;
+  unsettled_payments: number;
+  unsettled_payment_value: string;
+}
+
+export interface ApiReportExceptionCode {
+  code: string;
+  label: string;
+  count: number;
+  financial_impact: string;
+}
+
+export interface ApiReportExceptions {
+  total: number;
+  by_code: ApiReportExceptionCode[];
+  by_status: Record<string, number>;
+  exception_exposure: string;
+}
+
+export interface ApiReportInvestigations {
+  total: number;
+  ai_investigations: number;
+  awaiting_human_review: number;
+  resolved: number;
+  escalated: number;
+  in_progress: number;
+  resolution_rate: number;
+  escalation_rate: number;
+}
+
+export interface ApiReportAiInsights {
+  investigation_count: number;
+  average_confidence: string | null;
+  human_review_count: number;
+  human_decisions: Record<string, number>;
+  root_cause_categories: { category: string; count: number }[];
+}
+
+export interface ApiReportSummary {
+  period: { start: string | null; end: string | null };
+  available_period: { start: string | null; end: string | null };
+  financial_control: ApiReportFinancialControl;
+  exceptions: ApiReportExceptions;
+  investigations: ApiReportInvestigations;
+  ai: ApiReportAiInsights;
+}
