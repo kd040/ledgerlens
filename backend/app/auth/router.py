@@ -36,15 +36,40 @@ class RegisterRequest(BaseModel):
     password: str
 
 
+def _session_cookie_policy() -> dict[str, Any]:
+    """The attributes every write to (and deletion of) the session cookie
+    must share.
+
+    In production the frontend and the API are deliberately different
+    sites -- a Vercel origin calling a Render origin -- so every
+    authenticated request is a cross-site one. A browser only stores and
+    replays a cookie on those if it is SameSite=None, and the spec only
+    permits SameSite=None alongside Secure. Locally both ends are
+    localhost, where Lax is correct and Secure would stop the cookie
+    being set at all over plain HTTP.
+
+    Both attributes are derived from the same flag on purpose: a
+    SameSite=None cookie without Secure is silently dropped by every
+    modern browser, so they must never be able to disagree. Read at call
+    time rather than import time so the policy follows the environment
+    the process is actually running in.
+    """
+    production = os.getenv("ENV", "development") == "production"
+
+    return {
+        "httponly": True,
+        "samesite": "none" if production else "lax",
+        "secure": production,
+        "path": "/",
+    }
+
+
 def _set_session_cookie(response: Response, token: str) -> None:
     response.set_cookie(
         SESSION_COOKIE_NAME,
         token,
         max_age=int(SESSION_TTL.total_seconds()),
-        httponly=True,
-        samesite="lax",
-        secure=os.getenv("ENV", "development") == "production",
-        path="/",
+        **_session_cookie_policy(),
     )
 
 
@@ -101,7 +126,12 @@ def logout(
                 delete_session(cur, token)
                 conn.commit()
 
-    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+    # Same attributes the cookie was written with. A browser only treats
+    # a Set-Cookie as replacing an existing cookie when path/secure/
+    # samesite match, so logging out cross-site needs the identical
+    # policy -- otherwise the expired cookie is stored alongside the live
+    # one and the session appears to survive logout in the browser.
+    response.delete_cookie(SESSION_COOKIE_NAME, **_session_cookie_policy())
     return {"status": "ok"}
 
 

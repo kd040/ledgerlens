@@ -8,9 +8,11 @@ TEST-AUTH-* users/investigations only; cleans up after itself.
 Run directly: python backend/tests/test_auth.py
 """
 
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -322,6 +324,110 @@ def test_reviewer_can_escalate_with_required_note():
                 cur.execute("delete from sessions where user_id = %s", (user_id,))
                 cur.execute("delete from users where id = %s", (user_id,))
                 conn.commit()
+
+
+# ------------------------------------------------------------------
+# Cross-site session cookie policy
+# ------------------------------------------------------------------
+
+
+def _login_set_cookie_header(env: dict[str, str]) -> str:
+    """The raw Set-Cookie login emits under a given environment."""
+    with connect() as conn:
+        with conn.cursor() as cur:
+            user_id = _create_user(cur, ANALYST_EMAIL, "analyst")
+            conn.commit()
+            try:
+                with patch.dict(os.environ, env, clear=False):
+                    client = TestClient(app)
+                    response = client.post(
+                        "/auth/login",
+                        json={"email": ANALYST_EMAIL, "password": PASSWORD},
+                    )
+                assert response.status_code == 200
+                return response.headers.get("set-cookie", "")
+            finally:
+                cur.execute("delete from sessions where user_id = %s", (user_id,))
+                cur.execute("delete from users where id = %s", (user_id,))
+                conn.commit()
+
+
+def test_production_session_cookie_is_cross_site_capable():
+    """Deployed, the frontend (Vercel) and API (Render) are different
+    sites, so every authenticated request is cross-site. The browser only
+    replays the session cookie on those when it is SameSite=None, and
+    only accepts SameSite=None together with Secure -- so login must emit
+    all three of HttpOnly, Secure and SameSite=None in production. This
+    is the exact combination whose absence made /auth/me return 401 after
+    a successful login."""
+    header = _login_set_cookie_header({"ENV": "production"}).lower()
+
+    assert "httponly" in header
+    assert "samesite=none" in header
+    assert "secure" in header
+
+
+def test_development_session_cookie_stays_lax_and_insecure():
+    """Locally both ends are localhost, so Lax is correct -- and Secure
+    would stop the cookie being set at all over plain HTTP."""
+    header = _login_set_cookie_header({"ENV": "development"}).lower()
+
+    assert "httponly" in header
+    assert "samesite=lax" in header
+    assert "secure" not in header
+
+
+def test_samesite_none_is_never_emitted_without_secure():
+    """A SameSite=None cookie without Secure is silently discarded by
+    every modern browser, which would look exactly like the bug being
+    fixed. The two attributes derive from one flag, so this can never
+    drift -- asserted here directly."""
+    for env in ({"ENV": "production"}, {"ENV": "development"}, {"ENV": "staging"}):
+        header = _login_set_cookie_header(env).lower()
+        if "samesite=none" in header:
+            assert "secure" in header, f"{env} emitted SameSite=None without Secure"
+
+
+def test_logout_clears_the_cookie_with_matching_attributes():
+    """A browser only treats a Set-Cookie as replacing an existing cookie
+    when path/secure/samesite match, so logout has to repeat the same
+    policy or the expired cookie lands beside the live one."""
+    with connect() as conn:
+        with conn.cursor() as cur:
+            user_id = _create_user(cur, ANALYST_EMAIL, "analyst")
+            conn.commit()
+            try:
+                with patch.dict(os.environ, {"ENV": "production"}, clear=False):
+                    # https base URL on purpose: a Secure cookie is not
+                    # replayed over plain HTTP, by the client library as
+                    # by a real browser. Logging out cross-site is only
+                    # exercised faithfully over TLS.
+                    client = TestClient(app, base_url="https://testserver")
+                    client.post(
+                        "/auth/login",
+                        json={"email": ANALYST_EMAIL, "password": PASSWORD},
+                    )
+                    logout = client.post("/auth/logout")
+
+                assert logout.status_code == 200
+                header = logout.headers.get("set-cookie", "").lower()
+                assert "samesite=none" in header
+                assert "secure" in header
+                assert "path=/" in header
+            finally:
+                cur.execute("delete from sessions where user_id = %s", (user_id,))
+                cur.execute("delete from users where id = %s", (user_id,))
+                conn.commit()
+
+
+def test_cors_allows_credentials_without_a_wildcard_origin():
+    """allow_credentials only works against an explicit origin -- a
+    wildcard would make the browser drop every credentialed response."""
+    from app.main import allowed_origins
+
+    origins = [origin.strip() for origin in allowed_origins.split(",")]
+    assert "*" not in origins
+    assert all(origin.startswith("http") for origin in origins)
 
 
 if __name__ == "__main__":
