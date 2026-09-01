@@ -31,8 +31,16 @@ from app.ai.config import (
     MAX_TOOL_TURNS,
     MAX_TOTAL_TOOL_CALLS,
 )
-from app.ai.providers.base import AIProvider, AIProviderError
+from app.ai.providers.base import RETRYABLE_STATUS_CODES, AIProvider, AIProviderError
 from app.ai.tools import execute_tool
+
+
+def _is_transient(error: genai_errors.APIError) -> bool:
+    """Gemini's own 503 UNAVAILABLE / "model is currently experiencing
+    high demand" and 429 rate limits are worth another attempt; a 400
+    bad request, a 401 bad key or a 404 unknown model are not, and must
+    keep surfacing as themselves (see AIProviderError.retryable)."""
+    return getattr(error, "code", None) in RETRYABLE_STATUS_CODES
 
 
 class GeminiProvider(AIProvider):
@@ -109,13 +117,30 @@ class GeminiProvider(AIProvider):
                     model=self._model, contents=contents, config=config
                 )
             except genai_errors.ClientError as error:
-                raise AIProviderError(f"Gemini rejected the request: {error}") from error
+                raise AIProviderError(
+                    f"Gemini rejected the request: {error}",
+                    retryable=_is_transient(error),
+                    provider_status=getattr(error, "code", None),
+                ) from error
             except genai_errors.ServerError as error:
-                raise AIProviderError(f"Gemini provider error: {error}") from error
+                raise AIProviderError(
+                    f"Gemini provider error: {error}",
+                    retryable=_is_transient(error),
+                    provider_status=getattr(error, "code", None),
+                ) from error
             except genai_errors.APIError as error:
-                raise AIProviderError(f"Gemini returned an error: {error}") from error
+                raise AIProviderError(
+                    f"Gemini returned an error: {error}",
+                    retryable=_is_transient(error),
+                    provider_status=getattr(error, "code", None),
+                ) from error
             except Exception as error:  # covers HTTP-layer timeouts/connection errors
-                raise AIProviderError(f"Could not reach Gemini: {error}") from error
+                # Never reached the model at all -- a timeout or a dropped
+                # connection says nothing about whether the request itself
+                # is valid, so it is always worth one more attempt.
+                raise AIProviderError(
+                    f"Could not reach Gemini: {error}", retryable=True
+                ) from error
 
             if not response.candidates:
                 raise AIProviderError("Gemini returned no candidates.")

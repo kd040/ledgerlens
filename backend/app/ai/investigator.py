@@ -25,7 +25,9 @@ from pydantic import ValidationError
 from app.ai.config import AI_PROVIDER
 from app.ai.providers.anthropic_provider import AnthropicProvider
 from app.ai.providers.base import AIProvider, AIProviderError
+from app.ai.providers.failover import FailoverProvider
 from app.ai.providers.gemini_provider import GeminiProvider
+from app.ai.providers.groq_provider import GroqProvider
 from app.ai.schemas import AiInvestigationResult
 from app.ai.tools import TOOL_DEFINITIONS, build_tool_dispatch
 from app.investigation.runners.deterministic import connect, extract_payment_reference
@@ -123,13 +125,32 @@ def _known_facts_message(
 
 
 def _build_provider() -> AIProvider:
+    """AI_PROVIDER still selects the PRIMARY provider exactly as before --
+    nothing about that setting changed. What is new is that the primary is
+    wrapped in a failover chain (see providers/failover.py) that retries a
+    transient failure once and then falls back to Groq.
+
+    Groq is only attached when GROQ_API_KEY is actually set. With no key,
+    FailoverProvider(fallback=None) still gives the primary its one retry
+    but re-raises the primary's own error, so an install that has not
+    configured Groq behaves as it always did rather than reporting a
+    misleading "temporarily unavailable".
+    """
     if AI_PROVIDER == "gemini":
-        return GeminiProvider()
-    if AI_PROVIDER == "anthropic":
-        return AnthropicProvider()
-    raise AiInvestigationError(
-        f"Unknown AI_PROVIDER {AI_PROVIDER!r} (expected 'anthropic' or 'gemini').",
-        status_code=503,
+        primary: AIProvider = GeminiProvider()
+    elif AI_PROVIDER == "anthropic":
+        primary = AnthropicProvider()
+    else:
+        raise AiInvestigationError(
+            f"Unknown AI_PROVIDER {AI_PROVIDER!r} (expected 'anthropic' or 'gemini').",
+            status_code=503,
+        )
+
+    return FailoverProvider(
+        primary,
+        GroqProvider() if GroqProvider.is_configured() else None,
+        primary_name=AI_PROVIDER,
+        fallback_name="groq",
     )
 
 

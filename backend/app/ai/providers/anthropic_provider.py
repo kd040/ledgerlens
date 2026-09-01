@@ -18,7 +18,7 @@ from app.ai.config import (
     MAX_TOOL_TURNS,
     MAX_TOTAL_TOOL_CALLS,
 )
-from app.ai.providers.base import AIProvider, AIProviderError
+from app.ai.providers.base import RETRYABLE_STATUS_CODES, AIProvider, AIProviderError
 from app.ai.tools import execute_tool
 
 
@@ -73,14 +73,31 @@ class AnthropicProvider(AIProvider):
                     tools=tools,
                     messages=messages,
                 )
+            # Transient failures are marked retryable so the failover chain
+            # (see failover.py) treats the Anthropic path exactly like the
+            # Gemini one. Without this, switching AI_PROVIDER to anthropic
+            # would silently disable retry and fallback.
             except anthropic.RateLimitError as error:
-                raise AIProviderError(f"Anthropic rate limit reached: {error}") from error
+                raise AIProviderError(
+                    f"Anthropic rate limit reached: {error}",
+                    retryable=True,
+                    provider_status=429,
+                ) from error
             except anthropic.APITimeoutError as error:
-                raise AIProviderError(f"Anthropic request timed out: {error}") from error
+                raise AIProviderError(
+                    f"Anthropic request timed out: {error}", retryable=True, provider_status=408
+                ) from error
             except anthropic.APIConnectionError as error:
-                raise AIProviderError(f"Could not reach Anthropic: {error}") from error
+                raise AIProviderError(
+                    f"Could not reach Anthropic: {error}", retryable=True
+                ) from error
             except anthropic.APIStatusError as error:
-                raise AIProviderError(f"Anthropic returned an error: {error}") from error
+                status = getattr(error, "status_code", None)
+                raise AIProviderError(
+                    f"Anthropic returned an error: {error}",
+                    retryable=status in RETRYABLE_STATUS_CODES,
+                    provider_status=status,
+                ) from error
 
             if response.stop_reason != "tool_use":
                 raise AIProviderError(
