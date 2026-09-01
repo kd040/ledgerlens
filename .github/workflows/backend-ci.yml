@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - "backend/**"
+      - "database/migrations/**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
       - "backend/**"
+      - "database/migrations/**"
       - ".github/workflows/backend-ci.yml"
 
 jobs:
@@ -31,6 +33,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
           pip install pytest
+
+      - name: Apply database migrations
+        run: |
+          python - <<'PY'
+          import os
+          import psycopg
+
+          database_url = os.environ["SUPABASE_DB_URL"]
+
+          migrations = [
+              "database/migrations/001_initial_financial_schema.sql",
+              "database/migrations/002_reconciliation_investigation_schema.sql",
+              "database/migrations/003_add_settlement_reference.sql",
+              "database/migrations/004_create_amount_mismatch.sql",
+              "database/migrations/005_add_reconciliation_idempotency.sql",
+              "database/migrations/006_add_authentication.sql",
+              "database/migrations/007_add_investigation_human_decision.sql",
+              "database/migrations/008_add_ai_root_cause_assessment.sql",
+          ]
+
+          with psycopg.connect(database_url) as conn:
+              with conn.transaction():
+                  for migration in migrations:
+                      print(f"Applying {migration}")
+                      with open(migration, "r", encoding="utf-8") as f:
+                          conn.execute(f.read())
+
+          print("All migrations applied successfully.")
+          PY
 
       - name: Run backend tests
         working-directory: backend
