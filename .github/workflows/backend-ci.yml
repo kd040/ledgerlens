@@ -1,5 +1,9 @@
 name: Backend CI
 
+concurrency:
+  group: backend-ci-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     paths:
