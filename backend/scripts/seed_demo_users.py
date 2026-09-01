@@ -1,11 +1,18 @@
 """Seeds the two buildathon demo accounts (one per role). Idempotent --
 safe to run again after a password rotation.
 
-    backend/.venv/bin/python backend/scripts/seed_demo_users.py
+    DEMO_ANALYST_PASSWORD=... DEMO_REVIEWER_PASSWORD=... \
+        backend/.venv/bin/python backend/scripts/seed_demo_users.py
 
-Demo passwords are dev-only defaults, never checked into the frontend
-and never logged here beyond the confirmation line below. Override them
-for any real deployment via DEMO_ANALYST_PASSWORD / DEMO_REVIEWER_PASSWORD.
+Both passwords MUST be supplied through the environment. There are
+deliberately no defaults in this file: a default committed here would be
+a working credential for every deployment seeded from this repository,
+readable by anyone with access to the source or its history. Missing
+configuration fails loudly instead (see SeedConfigurationError).
+
+Passwords are hashed with the same PBKDF2-HMAC-SHA256 helper the login
+path uses (app/auth/security.py) and only the salt and hash are stored --
+the plaintext never reaches the database and is never logged here.
 """
 
 import os
@@ -22,23 +29,54 @@ DEMO_USERS = [
         "email": "analyst@ledgerlens.dev",
         "role": "analyst",
         "password_env": "DEMO_ANALYST_PASSWORD",
-        "default_password": "Analyst!Demo2026",
     },
     {
         "email": "reviewer@ledgerlens.dev",
         "role": "reviewer",
         "password_env": "DEMO_REVIEWER_PASSWORD",
-        "default_password": "Reviewer!Demo2026",
     },
 ]
 
 
+class SeedConfigurationError(RuntimeError):
+    """A required demo password was not supplied. Raised before any
+    database write happens, so a partial seed is impossible."""
+
+
+def resolve_passwords(env=None) -> dict[str, str]:
+    """Every demo password, or a clear error naming what is missing.
+
+    Resolved for ALL users up front, deliberately: seeding the analyst
+    and only then discovering the reviewer variable is missing would
+    leave the database half-rotated.
+    """
+    environment = os.environ if env is None else env
+
+    missing = [
+        spec["password_env"]
+        for spec in DEMO_USERS
+        if not (environment.get(spec["password_env"]) or "").strip()
+    ]
+    if missing:
+        raise SeedConfigurationError(
+            "Missing required demo password environment variable(s): "
+            + ", ".join(missing)
+            + ". Set them before seeding -- this script has no built-in "
+            "defaults on purpose, so that no working credential is ever "
+            "committed to the repository."
+        )
+
+    return {spec["email"]: environment[spec["password_env"]] for spec in DEMO_USERS}
+
+
 def seed() -> None:
+    # Fails here, before opening a connection, if anything is unset.
+    passwords = resolve_passwords()
+
     with connect() as conn:
         with conn.cursor() as cur:
             for spec in DEMO_USERS:
-                password = os.getenv(spec["password_env"], spec["default_password"])
-                salt, password_hash = hash_password(password)
+                salt, password_hash = hash_password(passwords[spec["email"]])
 
                 cur.execute(
                     """
@@ -57,4 +95,8 @@ def seed() -> None:
 
 
 if __name__ == "__main__":
-    seed()
+    try:
+        seed()
+    except SeedConfigurationError as error:
+        print(f"Configuration error: {error}", file=sys.stderr)
+        raise SystemExit(1) from error

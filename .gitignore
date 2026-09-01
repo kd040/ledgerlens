@@ -3,6 +3,20 @@
 .env.*
 !.env.example
 
+# Local secret material -- keys, certificates, service-account files.
+# Nothing of this shape belongs in a public repository.
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+secrets.json
+service-account*.json
+credentials.json
+
 # Python
 __pycache__/
 *.py[cod]

@@ -280,7 +280,15 @@ def test_existing_reviewer_can_still_resolve_and_escalate():
                 client = TestClient(app)
                 import os
 
-                password = os.getenv("DEMO_REVIEWER_PASSWORD", "Reviewer!Demo2026")
+                # No hard-coded fallback: a demo password committed here
+                # would be a working credential for any deployment seeded
+                # from this repository. Without the variable there is
+                # nothing to log in with, so skip exactly as this test
+                # already does when the password does not match.
+                password = os.getenv("DEMO_REVIEWER_PASSWORD")
+                if not password:
+                    return
+
                 login = client.post(
                     "/auth/login", json={"email": "reviewer@ledgerlens.dev", "password": password}
                 )
