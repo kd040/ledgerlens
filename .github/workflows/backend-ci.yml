@@ -37,7 +37,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
           pip install pytest
+      
+      - name: Reset CI database
+        run: |
+          python - <<'PY'
+          import os
+          import psycopg
 
+          database_url = os.environ["SUPABASE_DB_URL"]
+
+          with psycopg.connect(database_url) as conn:
+              with conn.transaction():
+                  conn.execute("drop schema public cascade")
+                  conn.execute("create schema public")
+
+          print("CI database reset successfully.")
+          PY
       - name: Apply database migrations
         run: |
           python - <<'PY'
