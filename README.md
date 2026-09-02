@@ -350,6 +350,69 @@ The suite covers reconciliation determinism and query-count regressions, the exc
 
 Data-integrity checks confirm the benchmark is unchanged after a full run: 100 `PAY-*` payments, EX01 15 / EX02 8 / EX03 7, 100 reconciliation links, 0 unintended human decisions, and no test residue.
 
+### Running tests locally
+
+The backend suite is not mocked at the database boundary — every test opens a
+real PostgreSQL connection. CI runs it against a **fresh, ephemeral
+`postgres:16` service container per run**, so it always starts from an empty
+database.
+
+That detail matters locally, because the suite has **no `conftest.py` and no
+fixtures**: tests create their own rows and clean up by hand at the end of each
+test, rather than being wrapped in a transaction that rolls back. A test that
+fails partway through can leave its rows behind, and the *next* run then fails
+on a unique-constraint violation for a row that a previous run created.
+
+**Those follow-up failures are an artefact of the test harness, not a defect in
+the code under test.** If you see `UniqueViolation` on `exceptions`, `users`, or
+`payments`, the fix is to start from a clean database rather than to go looking
+for a bug in reconciliation.
+
+The reliable way to run the backend suite locally is therefore to give it the
+same thing CI gives it — a throwaway database:
+
+```bash
+# 1. Start a disposable PostgreSQL instance
+docker run --rm -d \
+  --name ledgerlens-test \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=ledgerlens_test \
+  -p 5433:5432 \
+  postgres:16
+
+# 2. Point the app at it (this is the variable the code reads --
+#    see backend/app/investigation/runners/deterministic.py)
+export SUPABASE_DB_URL="postgresql://postgres:postgres@localhost:5433/ledgerlens_test"
+
+# 3. Apply schema, baseline records, then generate the 100-record benchmark
+for migration in database/migrations/*.sql; do
+  python scripts/run_migration.py "$migration"
+done
+python scripts/run_migration.py database/seeds/001_regression_baseline.sql
+python scripts/generate_eval_dataset.py
+
+# 4. Run the suite
+cd backend && pytest -q
+
+# 5. Tear down (--rm above means stopping is enough)
+docker stop ledgerlens-test
+```
+
+Port `5433` is used so this container does not collide with a PostgreSQL
+instance you may already be running on the default `5432`.
+
+To re-run the suite, repeat from step 1 with a fresh container. Re-running
+`pytest` against a database that has already been used is the situation
+described above.
+
+> `SUPABASE_DB_URL` is the variable name throughout this project, including for
+> local and CI databases that have nothing to do with Supabase. It is read in
+> exactly one place, `connect()` in
+> `backend/app/investigation/runners/deterministic.py`.
+
+The frontend suite has no such constraint — `npm test -- --run` is
+self-contained and repeatable.
+
 ---
 
 ## Local Development
@@ -488,6 +551,14 @@ The AI recommendation and the human decision are stored separately — for examp
 │
 └── README.md
 ```
+
+---
+
+## Development Notes
+
+[DEVELOPMENT.md](DEVELOPMENT.md) records how the project was actually built —
+the phases in the commit history, why work is batched into large commits, and
+what adding CI surfaced about the evaluation benchmark's reproducibility.
 
 ---
 
