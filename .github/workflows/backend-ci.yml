@@ -1,27 +1,56 @@
 name: Backend CI
 
-concurrency:
-  group: backend-ci-${{ github.event.pull_request.head.ref || github.ref }}
-  cancel-in-progress: true
-
 on:
   push:
+    branches: [main]
     paths:
       - "backend/**"
-      - "database/migrations/**"
+      - "database/**"
+      - "scripts/**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
+    branches: [main]
     paths:
       - "backend/**"
-      - "database/migrations/**"
+      - "database/**"
+      - "scripts/**"
       - ".github/workflows/backend-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # The suite is not mocked -- every test talks to a real PostgreSQL
+    # database. It runs against a disposable service container rather
+    # than a shared hosted database so that runs are isolated from each
+    # other (concurrent runs previously collided and left residue that
+    # failed later runs), need no credentials, and cannot touch any
+    # deployed environment.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ledgerlens_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     env:
-      SUPABASE_DB_URL: ${{ secrets.CI_SUPABASE_DB_URL }}
+      # Throwaway credentials for the ephemeral service container above.
+      # Not a secret: this database exists only for the life of the job
+      # and is reachable only from inside it.
+      SUPABASE_DB_URL: postgresql://postgres:postgres@localhost:5432/ledgerlens_test
 
     steps:
       - name: Checkout repository
@@ -31,57 +60,37 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
           pip install pytest
-      
-      - name: Reset CI database
-        run: |
-          python - <<'PY'
-          import os
-          import psycopg
 
-          database_url = os.environ["SUPABASE_DB_URL"]
-
-          with psycopg.connect(database_url) as conn:
-              with conn.transaction():
-                  conn.execute("drop schema public cascade")
-                  conn.execute("create schema public")
-
-          print("CI database reset successfully.")
-          PY
       - name: Apply database migrations
         run: |
-          python - <<'PY'
-          import os
-          import psycopg
+          for migration in database/migrations/*.sql; do
+            python scripts/run_migration.py "$migration"
+          done
 
-          database_url = os.environ["SUPABASE_DB_URL"]
+      - name: Seed regression baseline
+        run: python scripts/run_migration.py database/seeds/001_regression_baseline.sql
 
-          migrations = [
-              "database/migrations/001_initial_financial_schema.sql",
-              "database/migrations/002_reconciliation_investigation_schema.sql",
-              "database/migrations/003_add_settlement_reference.sql",
-              "database/migrations/004_create_amount_mismatch.sql",
-              "database/migrations/005_add_reconciliation_idempotency.sql",
-              "database/migrations/006_add_authentication.sql",
-              "database/migrations/007_add_investigation_human_decision.sql",
-              "database/migrations/008_add_ai_root_cause_assessment.sql",
-          ]
-
-          with psycopg.connect(database_url) as conn:
-              with conn.transaction():
-                  for migration in migrations:
-                      print(f"Applying {migration}")
-                      with open(migration, "r", encoding="utf-8") as f:
-                          conn.execute(f.read())
-
-          print("All migrations applied successfully.")
-          PY
+      - name: Generate deterministic evaluation dataset
+        run: python scripts/generate_eval_dataset.py
 
       - name: Run backend tests
         working-directory: backend
-        run: pytest -q
+        run: |
+          mkdir -p ../test-results
+          pytest -q --junitxml=../test-results/backend-junit.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: test-results/backend-junit.xml
+          if-no-files-found: warn

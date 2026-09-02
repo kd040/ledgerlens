@@ -1,5 +1,8 @@
 # LedgerLens
 
+[![Backend CI](https://github.com/kd040/ledgerlens/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/kd040/ledgerlens/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/kd040/ledgerlens/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/kd040/ledgerlens/actions/workflows/frontend-ci.yml)
+
 **An AI Finance Controller that reconciles payments against settlements, detects financial exceptions, investigates their root cause from evidence, and puts a human reviewer in charge of the decision.**
 
 Financial calculations stay deterministic. The AI explains evidence — it never computes money.
