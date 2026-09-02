@@ -1,0 +1,96 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "database/**"
+      - "scripts/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "database/**"
+      - "scripts/**"
+      - ".github/workflows/backend-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # The suite is not mocked -- every test talks to a real PostgreSQL
+    # database. It runs against a disposable service container rather
+    # than a shared hosted database so that runs are isolated from each
+    # other (concurrent runs previously collided and left residue that
+    # failed later runs), need no credentials, and cannot touch any
+    # deployed environment.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ledgerlens_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Throwaway credentials for the ephemeral service container above.
+      # Not a secret: this database exists only for the life of the job
+      # and is reachable only from inside it.
+      SUPABASE_DB_URL: postgresql://postgres:postgres@localhost:5432/ledgerlens_test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest
+
+      - name: Apply database migrations
+        run: |
+          for migration in database/migrations/*.sql; do
+            python scripts/run_migration.py "$migration"
+          done
+
+      - name: Seed regression baseline
+        run: python scripts/run_migration.py database/seeds/001_regression_baseline.sql
+
+      - name: Generate deterministic evaluation dataset
+        run: python scripts/generate_eval_dataset.py
+
+      - name: Run backend tests
+        working-directory: backend
+        run: |
+          mkdir -p ../test-results
+          pytest -q --junitxml=../test-results/backend-junit.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: test-results/backend-junit.xml
+          if-no-files-found: warn
