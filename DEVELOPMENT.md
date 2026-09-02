@@ -83,10 +83,10 @@ Two independent causes, both fixed in
 **The 100-record benchmark could not be reproduced on a clean database.** The
 generator `scripts/generate_eval_dataset.py` produces `PAY-006`..`PAY-100` *on
 top of* five hand-written regression cases, `PAY-001`..`PAY-005`. Those five
-records do exist in the repository, in
-`database/seeds/001_demo_financial_data.sql` (committed 25 Aug in `cd49837`) —
-but that file was never referenced by any script, workflow, or setup
-instruction. Nothing applied it. A fresh clone ran the migrations, applied no
+records do exist in the repository, in the demo seed committed 25 Aug in
+`cd49837` (since renumbered to
+`database/seeds/002_demo_financial_data.sql`) — but that file was never
+referenced by any script, workflow, or setup instruction. Nothing applied it. A fresh clone ran the migrations, applied no
 seed, and every benchmark assertion saw 0 payments instead of 100.
 
 The ordering that file depends on was also never written down. It inserts
@@ -118,15 +118,27 @@ Result: **203 passed in 10.08s**, with the whole job taking 1m19s, down from a
 14m50s failing run. The suite was network-bound against a hosted database, not
 slow on its own.
 
-### Open item
+### Seed file collision — resolved
 
-There are now two overlapping seed files.
-`database/seeds/001_demo_financial_data.sql` is the original and also seeds
-customers and orders; `database/seeds/001_regression_baseline.sql` is what CI
-applies and covers only the records reconciliation reads. They are not
-contradictory — the second is the first's payment subset, pre-transformed —
-but they should be consolidated, and the demo seed should either be wired into
-a documented setup path or removed.
+Two seed files were both numbered `001`. The original demo dataset has been
+renumbered to `database/seeds/002_demo_financial_data.sql`, and the
+relationship between the two is documented in
+[`database/seeds/README.md`](database/seeds/README.md). The numbering now
+reflects application order rather than the order the files were written.
+
+An earlier version of this note said the two files were "not contradictory."
+That was wrong. They overlap on every record they share — `PAY-001`..`PAY-005`,
+the five settlements, the fees, taxes, adjustment and bank transactions — and
+they **disagree on one value**: the demo seed writes `SET-002` at 1900.00 and
+relies on migration 004 to rewrite it to 1850.00, while the regression baseline
+writes 1850.00 directly. Applying the demo seed after all migrations therefore
+produces 14 EX01 exceptions instead of 15, silently.
+
+The duplication itself is still present. Consolidating it means rewriting seed
+SQL that no local environment in this project can execute — there is no
+container runtime or local PostgreSQL available here — and an untested rewrite
+of the fixture the benchmark depends on is a worse trade than documented
+duplication. The ordering hazard is recorded in the seeds README instead.
 
 ## Testing approach and its limits
 

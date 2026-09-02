@@ -401,6 +401,12 @@ docker stop ledgerlens-test
 Port `5433` is used so this container does not collide with a PostgreSQL
 instance you may already be running on the default `5432`.
 
+`001_regression_baseline.sql` is the only seed the test suite and the benchmark
+need. `database/seeds/002_demo_financial_data.sql` additionally seeds the
+customer and order records behind the deployed demo; it is optional, no
+automated process applies it, and it has ordering requirements — see
+[`database/seeds/README.md`](database/seeds/README.md) before applying it.
+
 To re-run the suite, repeat from step 1 with a fresh container. Re-running
 `pytest` against a database that has already been used is the situation
 described above.
